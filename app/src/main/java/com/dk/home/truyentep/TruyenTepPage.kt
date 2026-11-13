@@ -1,6 +1,9 @@
 package com.dk.home.truyentep
 
 import android.app.Activity
+import android.content.res.ColorStateList
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.StateListDrawable
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
@@ -23,9 +26,13 @@ class TruyenTepPage(private val act: Activity) : LinearLayout(act), TruyenTepSes
     companion object {
         /** Mã yêu cầu của hộp chọn tệp; MainActivity chuyển kết quả về [onPicked]. */
         const val REQ_PICK = 7501
-        private const val BG = 0xFF0D1224
-        private const val CYAN = 0xFF00E5FF
-        private const val DIM = 0xFF7F8BC0
+        // Cùng bảng màu với trang Điều khiển / YouTube: nền navy đậm, chữ cyan, chữ phụ xám xanh
+        private val BG_TOP = 0xFF0F1426.toInt()
+        private val BG_BOTTOM = 0xFF0A0C12.toInt()
+        private val PANEL = 0xFF121A33.toInt()
+        private val EDGE = 0xFF2C3A78.toInt()
+        private val CYAN = 0xFF00E5FF.toInt()
+        private val DIM = 0xFF7F8BC0.toInt()
     }
 
     private val session: TruyenTepSession = run {
@@ -37,23 +44,48 @@ class TruyenTepPage(private val act: Activity) : LinearLayout(act), TruyenTepSes
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
+    /** Kiểu chữ tiêu đề giống các trang khác: chữ đậm, khoảng cách rộng. */
+    private fun styleTitle(t: TextView) {
+        t.typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
+        t.letterSpacing = 0.08f
+    }
+
+    /** Nút viền cyan, nền tối như các nút khác của app; mờ đi khi bị khóa. */
+    private fun styleButton(b: Button) {
+        val corner = dp(8).toFloat()
+        val on = GradientDrawable().apply {
+            setColor(PANEL); cornerRadius = corner; setStroke(dp(1), CYAN)
+        }
+        val off = GradientDrawable().apply {
+            setColor(PANEL); cornerRadius = corner; setStroke(dp(1), EDGE)
+        }
+        b.background = StateListDrawable().apply {
+            addState(intArrayOf(-android.R.attr.state_enabled), off)
+            addState(intArrayOf(), on)
+        }
+        b.setTextColor(ColorStateList(
+            arrayOf(intArrayOf(-android.R.attr.state_enabled), intArrayOf()),
+            intArrayOf(0x66FFFFFF, CYAN)
+        ))
+        b.isAllCaps = false
+        styleTitle(b)
+    }
+
     private val titleView = TextView(act).apply {
         text = "TRUYỀN TỆP"
-        setTextColor(CYAN.toInt())
+        setTextColor(CYAN)
         textSize = 18f
-        typeface = Typeface.DEFAULT_BOLD
         gravity = Gravity.CENTER
     }
     private val codeView = TextView(act).apply {
         textSize = 30f
         setTextColor(Color.WHITE)
-        typeface = Typeface.DEFAULT_BOLD
         gravity = Gravity.CENTER
         setPadding(0, dp(12), 0, dp(4))
     }
     private val hintView = TextView(act).apply {
         text = "Nhập mã này trong Qrtuxa trên máy tính"
-        setTextColor(DIM.toInt())
+        setTextColor(DIM)
         textSize = 13f
         gravity = Gravity.CENTER
     }
@@ -77,7 +109,7 @@ class TruyenTepPage(private val act: Activity) : LinearLayout(act), TruyenTepSes
     }
     private val filesView = TextView(act).apply {
         text = "Chưa chọn tệp nào"
-        setTextColor(DIM.toInt())
+        setTextColor(DIM)
         textSize = 13f
         setPadding(0, dp(8), 0, dp(8))
     }
@@ -99,7 +131,10 @@ class TruyenTepPage(private val act: Activity) : LinearLayout(act), TruyenTepSes
 
     init {
         orientation = VERTICAL
-        setBackgroundColor(BG.toInt())
+        background = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(BG_TOP.toInt(), BG_BOTTOM.toInt())
+        )
         setPadding(dp(16), dp(16), dp(16), dp(16))
         addView(titleView, LinearLayout.LayoutParams(-1, -2))
         addView(codeView, LinearLayout.LayoutParams(-1, -2))
@@ -112,6 +147,13 @@ class TruyenTepPage(private val act: Activity) : LinearLayout(act), TruyenTepSes
         addView(sendBtn, LinearLayout.LayoutParams(-1, -2))
         addView(progress, LinearLayout.LayoutParams(-1, -2))
         addView(sendStatus, LinearLayout.LayoutParams(-1, -2))
+        styleTitle(titleView)
+        styleTitle(codeView)
+        styleButton(photoBtn)
+        styleButton(newCodeBtn)
+        styleButton(pickBtn)
+        styleButton(sendBtn)
+        progress.progressTintList = ColorStateList.valueOf(CYAN)
         session.listener = this
         codeView.text = currentCode()
         renderStatus(0)
