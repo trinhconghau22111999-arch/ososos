@@ -219,11 +219,25 @@
             android:layout_weight="1"
             android:scrollbars="none">
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
             <GridLayout
                 android:id="@+id/ccGrid"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:columnCount="4" />
+
+                <FrameLayout
+                    android:id="@+id/qsbHolder"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:layout_marginBottom="6dp"
+                    android:visibility="gone" />
+            </LinearLayout>
         </ScrollView>
     </LinearLayout>
 

@@ -5,6 +5,10 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.appwidget.AppWidgetHost;
+import android.appwidget.AppWidgetHostView;
+import android.appwidget.AppWidgetManager;
+import android.appwidget.AppWidgetProviderInfo;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
@@ -88,6 +92,13 @@ public class MainActivity extends Activity {
     private RemotePage rc;
     private boolean rcActive;
     private View brPanel;
+    // Thanh tìm kiếm Google (tiện ích mặc định của máy) ở cuối trang Tiện ích
+    private static final int REQ_QSB_BIND = 7301, REQ_QSB_CFG = 7302;
+    private static final String KEY_QSB = "qsb_id", KEY_QSB_ASKED = "qsb_asked";
+    private AppWidgetHost qsbHost;
+    private AppWidgetManager qsbMgr;
+    private FrameLayout qsbHolder;
+    private int qsbId = -1;
     private BrowserPage br;
     private boolean brActive;
     private View customView;
@@ -156,6 +167,13 @@ public class MainActivity extends Activity {
         br = new BrowserPage(this);
         ((ViewGroup) brPanel).addView(br, new FrameLayout.LayoutParams(-1, -1));
         touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
+        qsbHolder = findViewById(R.id.qsbHolder);
+        try {
+            qsbMgr = AppWidgetManager.getInstance(this);
+            qsbHost = new AppWidgetHost(this, 1024);
+            qsbId = getSharedPreferences(PREFS, MODE_PRIVATE).getInt(KEY_QSB, -1);
+            if (qsbId >= 0) showQsb(qsbId);
+        } catch (Exception ignored) { }
 
         findViewById(R.id.clockPanel).setBackground(Ui.panel(this, Ui.GRID));
         findViewById(R.id.clock).setOnClickListener(v -> openClockApp());
@@ -187,6 +205,18 @@ public class MainActivity extends Activity {
             public void onTextChanged(CharSequence s, int a, int b2, int c) { filter(s.toString()); }
             public void afterTextChanged(Editable s) { }
         });
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        try { if (qsbHost != null) qsbHost.startListening(); } catch (Exception ignored) { }
+    }
+
+    @Override
+    protected void onStop() {
+        try { if (qsbHost != null) qsbHost.stopListening(); } catch (Exception ignored) { }
+        super.onStop();
     }
 
     @Override
@@ -246,6 +276,12 @@ public class MainActivity extends Activity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == RemotePage.REQ_VOICE) {
             if (rc != null) rc.onVoiceResult(resultCode, data);
+        } else if (requestCode == REQ_QSB_BIND) {
+            if (resultCode == RESULT_OK && qsbId >= 0) afterQsbBound(qsbId);
+            else dropQsb();
+        } else if (requestCode == REQ_QSB_CFG) {
+            if (resultCode == RESULT_OK && qsbId >= 0) showQsb(qsbId);
+            else dropQsb();
         } else {
             super.onActivityResult(requestCode, resultCode, data);
         }
@@ -369,7 +405,7 @@ public class MainActivity extends Activity {
                 if (pos == 0f && yt != null) {
                     yt.evaluateJavascript("document.querySelectorAll('video').forEach(function(v){v.pause();})", null);
                 }
-                if (pos == 1f) cc.refresh();
+                if (pos == 1f) { cc.refresh(); ensureQsb(); }
             }
         });
         anim.start();
@@ -683,6 +719,78 @@ public class MainActivity extends Activity {
         addPkgs(t, "com.google.android.calendar", "com.android.calendar", "com.samsung.android.calendar",
                 "com.coloros.calendar", "com.oplus.calendar", "com.miui.calendar", "com.huawei.calendar");
         if (!launchFirst(t)) Toast.makeText(this, "Không tìm thấy ứng dụng Lịch", Toast.LENGTH_SHORT).show();
+    }
+
+    // ---------- Thanh tìm kiếm Google (tiện ích của máy) ----------
+
+    private AppWidgetProviderInfo findGoogleSearch() {
+        if (qsbMgr == null) return null;
+        AppWidgetProviderInfo any = null;
+        for (AppWidgetProviderInfo i : qsbMgr.getInstalledProviders()) {
+            if (i.provider == null || !"com.google.android.googlequicksearchbox".equals(i.provider.getPackageName())) continue;
+            String cls = i.provider.getClassName().toLowerCase();
+            if (cls.contains("search") || cls.contains("qsb")) return i;
+            if (any == null) any = i;
+        }
+        return any;
+    }
+
+    /** Lần đầu mở trang Tiện ích: xin gắn tiện ích Google (hệ thống hiện hộp thoại cho phép). Từ chối thì không hỏi lại. */
+    private void ensureQsb() {
+        if (qsbHost == null || qsbMgr == null) return;
+        SharedPreferences sp = getSharedPreferences(PREFS, MODE_PRIVATE);
+        if (qsbId >= 0 || sp.getBoolean(KEY_QSB_ASKED, false)) return;
+        AppWidgetProviderInfo info = findGoogleSearch();
+        if (info == null) return;
+        sp.edit().putBoolean(KEY_QSB_ASKED, true).apply();
+        try {
+            qsbId = qsbHost.allocateAppWidgetId();
+            if (qsbMgr.bindAppWidgetIdIfAllowed(qsbId, info.provider)) {
+                afterQsbBound(qsbId);
+            } else {
+                Intent i = new Intent(AppWidgetManager.ACTION_APPWIDGET_BIND)
+                        .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, qsbId)
+                        .putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, info.provider);
+                startActivityForResult(i, REQ_QSB_BIND);
+            }
+        } catch (Exception e) {
+            dropQsb();
+        }
+    }
+
+    private void afterQsbBound(int id) {
+        AppWidgetProviderInfo info = qsbMgr.getAppWidgetInfo(id);
+        if (info != null && info.configure != null) {
+            try {
+                qsbHost.startAppWidgetConfigureActivityForResult(this, id, 0, REQ_QSB_CFG, null);
+                return;
+            } catch (Exception ignored) { }
+        }
+        showQsb(id);
+    }
+
+    private void showQsb(int id) {
+        try {
+            AppWidgetProviderInfo info = qsbMgr.getAppWidgetInfo(id);
+            if (info == null) { dropQsb(); return; }
+            AppWidgetHostView hv = qsbHost.createView(this, id, info);
+            hv.setAppWidget(id, info);
+            qsbHolder.removeAllViews();
+            int h = Math.max(dp(56), info.minHeight);
+            qsbHolder.addView(hv, new FrameLayout.LayoutParams(-1, h));
+            qsbHolder.setVisibility(View.VISIBLE);
+            qsbId = id;
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putInt(KEY_QSB, id).apply();
+        } catch (Exception e) {
+            dropQsb();
+        }
+    }
+
+    private void dropQsb() {
+        try { if (qsbHost != null && qsbId >= 0) qsbHost.deleteAppWidgetId(qsbId); } catch (Exception ignored) { }
+        qsbId = -1;
+        if (qsbHolder != null) { qsbHolder.removeAllViews(); qsbHolder.setVisibility(View.GONE); }
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove(KEY_QSB).apply();
     }
 
     private boolean hitBox(View v, float rawX, float rawY) {
