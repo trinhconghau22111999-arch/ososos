@@ -7,6 +7,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
+import android.content.res.Configuration;
 import android.widget.BaseAdapter;
 import android.widget.ListView;
 import android.content.ComponentName;
@@ -154,6 +155,7 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (yt != null) yt.onResume();
+        ensureDark();
         reloadApps();
         Intent bat = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
         if (bat != null) {
@@ -686,6 +688,33 @@ public class MainActivity extends Activity {
             d.dismiss();
         });
         d.show();
+    }
+
+    private static boolean darkTried;
+
+    /**
+     * Mở app là đưa điện thoại về giao diện tối.
+     * 1) Có quyền WRITE_SECURE_SETTINGS (cấp một lần bằng adb) thì đặt thẳng ui_night_mode = tối.
+     * 2) Không có thì nhờ dịch vụ Hỗ trợ tiếp cận bấm nút "Chế độ tối" trong bảng nhanh (nếu dịch vụ đã bật).
+     * Mỗi lần chạy app chỉ thử một lần để không lặp.
+     */
+    private void ensureDark() {
+        if (darkTried) return;
+        boolean dark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
+                == Configuration.UI_MODE_NIGHT_YES;
+        if (dark) return;
+        darkTried = true;
+        try {
+            if (checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") == PackageManager.PERMISSION_GRANTED) {
+                Settings.Secure.putInt(getContentResolver(), "ui_night_mode", 2);
+                return;
+            }
+        } catch (Exception ignored) { }
+        ScreenshotService svc = ScreenshotService.instance;
+        if (svc != null) {
+            ControlCenter.keepOpen = true;
+            svc.clickTile(new String[]{"chế độ tối", "giao diện tối", "dark mode", "dark"}, null);
+        }
     }
 
     private int iconDpFor(int c) {
