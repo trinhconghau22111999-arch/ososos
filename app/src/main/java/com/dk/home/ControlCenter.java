@@ -165,17 +165,23 @@ final class ControlCenter {
         ui.postDelayed(this::refresh, 2200);
     }
 
-    /** Bấm nút tương ứng trong bảng cài đặt nhanh của hệ thống (qua dịch vụ hỗ trợ tiếp cận). */
-    private void viaQs(String... keys) {
+    /**
+     * Bấm nút tương ứng trong bảng cài đặt nhanh của hệ thống (qua dịch vụ hỗ trợ tiếp cận).
+     * Nếu dịch vụ chưa bật hoặc không tìm thấy nút thì mở thẳng màn hình cài đặt tương ứng (fallback).
+     */
+    private void viaQs(String fallbackAction, String... keys) {
         ScreenshotService svc = ScreenshotService.instance;
         if (svc == null) {
-            Toast.makeText(a, "Bật \"DK Home\" trong Hỗ trợ tiếp cận để nút này hoạt động trực tiếp", Toast.LENGTH_LONG).show();
-            go(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+            Toast.makeText(a, "Mở cài đặt. Bật \"DK Home\" trong Hỗ trợ tiếp cận để bấm trực tiếp được", Toast.LENGTH_LONG).show();
+            go(new Intent(fallbackAction));
             return;
         }
         keepOpen = true;
         svc.clickTile(keys, ok -> {
-            if (!ok) Toast.makeText(a, "Không tìm thấy nút này trong bảng nhanh của máy", Toast.LENGTH_LONG).show();
+            if (!ok) {
+                Toast.makeText(a, "Không tìm thấy nút trong bảng nhanh, mở cài đặt", Toast.LENGTH_SHORT).show();
+                go(new Intent(fallbackAction));
+            }
             ui.postDelayed(() -> keepOpen = false, 1500);
             later();
         });
@@ -220,13 +226,13 @@ final class ControlCenter {
         bind(w, () -> wifi.isWifiEnabled(), () -> {
             boolean ok = false;
             try { ok = wifi.setWifiEnabled(!wifi.isWifiEnabled()); } catch (Exception ignored) { }
-            if (ok) later(); else viaQs("wi-fi", "wifi", "wlan");
+            if (ok) later(); else viaQs(Settings.ACTION_WIFI_SETTINGS, "wi-fi", "wifi", "wlan");
         });
         refreshers.add(() -> w.sub.setText(Ui.up(wifi.isWifiEnabled() ? "Đang bật" : "Đã tắt")));
         place(w.root, 0, 0, 1, 2);
 
         Tile d = tile("⇅", "Dữ liệu di động", "", true);
-        bind(d, this::cellular, () -> viaQs(dataKeys()));
+        bind(d, this::cellular, () -> viaQs(Settings.ACTION_DATA_ROAMING_SETTINGS, dataKeys()));
         refreshers.add(() -> {
             String op = tele.getNetworkOperatorName();
             d.title.setText(Ui.up(op == null || op.isEmpty() ? "Dữ liệu di động" : op));
@@ -294,17 +300,17 @@ final class ControlCenter {
                 BluetoothAdapter ad = BluetoothAdapter.getDefaultAdapter();
                 if (ad != null) ok = ad.isEnabled() ? ad.disable() : ad.enable();
             } catch (Exception ignored) { }
-            if (ok) later(); else viaQs("bluetooth");
+            if (ok) later(); else viaQs(Settings.ACTION_BLUETOOTH_SETTINGS, "bluetooth");
         });
         place(bt.root, 3, 0, 1, 1);
 
         Tile air = tile("✈", "Máy bay", "", false);
         bind(air, () -> Settings.Global.getInt(a.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 0) == 1,
-                () -> viaQs("chế độ máy bay", "máy bay", "airplane", "flight mode"));
+                () -> viaQs(Settings.ACTION_AIRPLANE_MODE_SETTINGS, "chế độ máy bay", "máy bay", "airplane", "flight mode"));
         place(air.root, 3, 1, 1, 1);
 
         Tile hot = tile("◉", "Phát Wi-Fi", "", false);
-        bind(hot, null, () -> viaQs("điểm phát sóng", "phát wi-fi", "điểm phát wi-fi", "hotspot", "điểm truy cập"));
+        bind(hot, null, () -> viaQs(Settings.ACTION_WIRELESS_SETTINGS, "điểm phát sóng", "phát wi-fi", "điểm phát wi-fi", "hotspot", "điểm truy cập"));
         place(hot.root, 3, 2, 1, 1);
 
         Tile rot = tile("🔒", "Khóa xoay", "", false);
@@ -334,11 +340,11 @@ final class ControlCenter {
 
         Tile dark = tile("🌓", "Chế độ tối", "", false);
         bind(dark, () -> (a.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
-                == Configuration.UI_MODE_NIGHT_YES, () -> viaQs("chế độ tối", "giao diện tối", "dark mode", "dark"));
+                == Configuration.UI_MODE_NIGHT_YES, () -> viaQs(Settings.ACTION_DISPLAY_SETTINGS, "chế độ tối", "giao diện tối", "dark mode", "dark"));
         place(dark.root, 4, 1, 1, 1);
 
         Tile saver = tile("🔋", "Tiết kiệm pin", "", false);
-        bind(saver, () -> power.isPowerSaveMode(), () -> viaQs("tiết kiệm pin", "tiết kiệm điện", "battery saver", "power saving"));
+        bind(saver, () -> power.isPowerSaveMode(), () -> viaQs(Settings.ACTION_BATTERY_SAVER_SETTINGS, "tiết kiệm pin", "tiết kiệm điện", "battery saver", "power saving"));
         place(saver.root, 4, 2, 1, 1);
 
         Tile torch = tile("🔦", "Đèn pin", "", false);
@@ -353,11 +359,11 @@ final class ControlCenter {
 
         // Hàng 5: vị trí, bảo vệ mắt
         Tile pos = tile("📍", "Vị trí", "", false);
-        bind(pos, this::locationOn, () -> viaQs("vị trí", "định vị", "location", "gps"));
+        bind(pos, this::locationOn, () -> viaQs(Settings.ACTION_LOCATION_SOURCE_SETTINGS, "vị trí", "định vị", "location", "gps"));
         place(pos.root, 5, 0, 1, 1);
 
         Tile eye = tile("👁", "Bảo vệ mắt", "", false);
-        bind(eye, null, () -> viaQs("bảo vệ mắt", "eye comfort", "eye protection", "chế độ đọc"));
+        bind(eye, null, () -> viaQs(Settings.ACTION_DISPLAY_SETTINGS, "bảo vệ mắt", "eye comfort", "eye protection", "chế độ đọc"));
         place(eye.root, 5, 1, 1, 1);
 
         // Theo dõi trạng thái đèn pin
