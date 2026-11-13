@@ -74,6 +74,8 @@ public class MainActivity extends Activity {
     private PackageManager pm;
     private EditText search;
     private TextView battery;
+    private TextView homeTitle;
+    private static final String DEFAULT_TITLE = "HẬU OS";
     private GridLayout grid;
     private ScrollView scroll;
     private View ccPanel, ccHeader, homeRoot, ytPanel;
@@ -160,6 +162,9 @@ public class MainActivity extends Activity {
         findViewById(R.id.date).setOnClickListener(v -> openCalendarApp());
         search.setBackground(Ui.panel(this, Ui.PLAIN));
         battery.setBackground(Ui.panel(this, Ui.HOT, 8));
+        homeTitle = findViewById(R.id.homeTitle);
+        homeTitle.setText(Ui.up(getSharedPreferences(PREFS, MODE_PRIVATE).getString("home_title", DEFAULT_TITLE)));
+        homeTitle.setOnClickListener(v -> showRename());
         // Bấm vào nhãn PIN: mở trang Pin trong Cài đặt
         battery.setOnClickListener(v -> {
             List<Intent> t = new ArrayList<>();
@@ -1036,6 +1041,77 @@ public class MainActivity extends Activity {
             });
             box.addView(row);
         }
+        d.show();
+    }
+
+    /** Bấm vào tên ở đầu màn hình chính để đổi tên (để trống = về "HẬU OS"). */
+    private void showRename() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(16), dp(16), dp(16), dp(12));
+
+        TextView title = new TextView(this);
+        title.setText("ĐỔI TÊN");
+        title.setTextColor(Ui.CYAN);
+        title.setTextSize(16);
+        title.setPadding(0, 0, 0, dp(8));
+        Ui.style(title);
+        box.addView(title);
+
+        final EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setTextColor(Color.WHITE);
+        input.setHintTextColor(Ui.DIM);
+        input.setHint(DEFAULT_TITLE);
+        input.setText(homeTitle.getText());
+        input.setSelectAllOnFocus(true);
+        input.setBackground(Ui.panel(this, Ui.PLAIN, 8));
+        input.setPadding(dp(12), dp(10), dp(12), dp(10));
+        box.addView(input, new LinearLayout.LayoutParams(-1, -2));
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.END);
+        row.setPadding(0, dp(10), 0, 0);
+        TextView cancel = new TextView(this);
+        cancel.setText("HỦY");
+        cancel.setTextColor(Ui.DIM);
+        cancel.setTextSize(14);
+        cancel.setPadding(dp(14), dp(10), dp(14), dp(10));
+        Ui.style(cancel);
+        TextView ok = new TextView(this);
+        ok.setText("LƯU");
+        ok.setTextColor(Ui.CYAN);
+        ok.setTextSize(14);
+        ok.setPadding(dp(14), dp(10), dp(14), dp(10));
+        Ui.style(ok);
+        row.addView(cancel);
+        row.addView(ok);
+        box.addView(row);
+
+        final AlertDialog d = new AlertDialog.Builder(this).setView(box).create();
+        if (d.getWindow() != null) {
+            d.getWindow().setBackgroundDrawable(Ui.panel(this, Ui.GRID));
+            d.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+        }
+        cancel.setOnClickListener(v -> d.dismiss());
+        ok.setOnClickListener(v -> {
+            String name = input.getText().toString().trim();
+            SharedPreferences.Editor ed = getSharedPreferences(PREFS, MODE_PRIVATE).edit();
+            if (name.isEmpty() || name.equalsIgnoreCase(DEFAULT_TITLE)) {
+                ed.remove("home_title");
+                name = DEFAULT_TITLE;
+            } else {
+                ed.putString("home_title", name);
+            }
+            ed.apply();
+            homeTitle.setText(Ui.up(name));
+            d.dismiss();
+        });
+        input.setOnEditorActionListener((v, id, ev) -> {
+            ok.performClick();
+            return true;
+        });
         d.show();
     }
 
