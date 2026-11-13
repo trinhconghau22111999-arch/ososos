@@ -588,18 +588,18 @@ class RemotePage(private val host: Activity) : FrameLayout(host) {
 
     // ---------------------------------------------------------------- chuột cảm ứng
 
-    @SuppressLint("ClickableViewAccessibility")
     private var padView: View? = null
 
-    /** Cho phép vuốt quay lại từ mép trái hoặc từ vùng phía trên ô cảm ứng (nút trên cùng). */
+    /** Cho phép vuốt quay lại từ dải bên trái (~22% bề rộng) hoặc từ vùng ngoài ô cảm ứng. */
     fun canSwipeBackFrom(rawX: Float, rawY: Float): Boolean {
-        if (rawX < dp(48)) return true
+        if (rawX < maxOf(dp(48), (resources.displayMetrics.widthPixels * 0.22f).toInt())) return true
         val pv = padView ?: return false
         val loc = IntArray(2)
         pv.getLocationOnScreen(loc)
-        return rawY < loc[1]
+        return rawY < loc[1] || rawY > loc[1] + pv.height
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private fun attachTouchpad(pad: View) {
         padView = pad
         pad.setOnTouchListener { _, e ->
