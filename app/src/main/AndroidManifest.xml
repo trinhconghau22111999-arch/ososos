@@ -53,5 +53,16 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/screenshot_service" />
         </service>
+        <!-- Truyen tep (chep tu truyentep): chup anh + nhap chu + gui tep sang Qrtuxa -->
+        <activity
+            android:name="com.dk.home.truyentep.PhotoCaptureActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.HomeCamera"
+            android:windowSoftInputMode="stateHidden|adjustResize" />
+        <activity
+            android:name="com.dk.home.truyentep.SendFileActivity"
+            android:exported="false"
+            android:theme="@style/Theme.HomeCamera" />
     </application>
 </manifest>

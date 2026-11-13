@@ -18,7 +18,8 @@ import org.webrtc.EglBase
 import org.webrtc.PeerConnectionFactory
 
 private const val TAG = "TruyenTepSession"
-private const val MAX_VIEWERS = 4
+/** Số máy tính tối đa cùng lúc (giữ như bản truyentep gốc). */
+const val MAX_VIEWERS_PER_CAMERA = 4
 private const val BASE_RECONNECT_DELAY_MS = 2000L
 private const val MAX_RECONNECT_DELAY_MS = 30_000L
 
@@ -45,6 +46,21 @@ class TruyenTepSession(private val ctx: Context) {
 
     var listener: Listener? = null
 
+    /** Kiểu lắng nghe của bản gốc (màn hình chụp ảnh dùng để hiện trạng thái kết nối). */
+    interface ConnectionStatusListener {
+        fun onConnectionStatusChanged(connectedCount: Int, maxViewers: Int)
+    }
+    private val statusListeners = java.util.concurrent.CopyOnWriteArrayList<ConnectionStatusListener>()
+
+    fun addConnectionStatusListener(l: ConnectionStatusListener) {
+        statusListeners.add(l)
+        l.onConnectionStatusChanged(connectedCount(), MAX_VIEWERS_PER_CAMERA)
+    }
+
+    fun removeConnectionStatusListener(l: ConnectionStatusListener) {
+        statusListeners.remove(l)
+    }
+
     private val handler = Handler(Looper.getMainLooper())
     private val viewerConns = LinkedHashMap<String, ViewerConn>()
     private var viewersRef: DatabaseReference? = null
@@ -61,7 +77,10 @@ class TruyenTepSession(private val ctx: Context) {
 
     private fun notifyStatus() {
         val n = connectedCount()
-        handler.post { listener?.onConnectionChanged(n) }
+        handler.post {
+            listener?.onConnectionChanged(n)
+            statusListeners.forEach { it.onConnectionStatusChanged(n, MAX_VIEWERS_PER_CAMERA) }
+        }
     }
 
     /** Bắt đầu nhận kết nối cho mã [code]. Gọi trên luồng chính. */
@@ -137,7 +156,7 @@ class TruyenTepSession(private val ctx: Context) {
                     snapshot.ref.removeValue()
                     return
                 }
-                if (viewerConns.size >= MAX_VIEWERS) return
+                if (viewerConns.size >= MAX_VIEWERS_PER_CAMERA) return
                 val conn = ViewerConn(viewerId)
                 conn.reconnectRunnable = Runnable { if (!conn.removed) connectViewer(code, conn) }
                 viewerConns[viewerId] = conn
@@ -246,6 +265,52 @@ class TruyenTepSession(private val ctx: Context) {
             }.start()
         }
         return sent
+    }
+
+    /** Tên hàm như bản gốc: gửi 1 tệp cho mọi máy tính (viewerId không còn cần, truyền rỗng). */
+    fun sendFileToAllViewers(
+        fileBytes: ByteArray, fileName: String, mimeType: String,
+        onProgress: (viewerId: String, percent: Int) -> Unit = { _, _ -> },
+        onAnyResult: (viewerId: String, success: Boolean) -> Unit = { _, _ -> }
+    ): Int = sendFileToAll(
+        fileBytes, fileName, mimeType,
+        onProgress = { onProgress("", it) },
+        onResult = { onAnyResult("", it) }
+    )
+
+    /** Gửi 1 thao tác sửa chữ (xóa del ký tự trước con trỏ, chèn ins) cho các máy tính đang kết nối. */
+    fun sendTextEditToAllViewers(del: Int, ins: String): Int {
+        val targets = viewerConns.values.mapNotNull { it.pcm }.filter { it.isReadyToSendFile() }
+        if (targets.isEmpty()) return 0
+        val chunks = splitTextForSending(ins, 3000)
+        var okCount = 0
+        for (pcm in targets) {
+            var allSent = true
+            for ((idx, part) in chunks.withIndex()) {
+                val json = org.json.JSONObject().apply {
+                    put("type", "text-edit")
+                    put("del", if (idx == 0) del else 0)
+                    put("ins", part)
+                }.toString()
+                if (!pcm.sendJsonMessage(json)) { allSent = false; break }
+            }
+            if (allSent) okCount++
+        }
+        return okCount
+    }
+
+    /** Tách chuỗi thành các đoạn <= maxLen ký tự, không cắt đôi cặp ký tự thay thế (emoji). */
+    private fun splitTextForSending(text: String, maxLen: Int): List<String> {
+        if (text.length <= maxLen) return listOf(text)
+        val out = mutableListOf<String>()
+        var i = 0
+        while (i < text.length) {
+            var end = minOf(i + maxLen, text.length)
+            if (end < text.length && Character.isHighSurrogate(text[end - 1])) end--
+            out.add(text.substring(i, end))
+            i = end
+        }
+        return out
     }
 
     /** Lưu tệp nhận từ máy tính vào Download/QrTruyenTep (như bản gốc). */

@@ -23,14 +23,15 @@ class TruyenTepPage(private val act: Activity) : LinearLayout(act), TruyenTepSes
     companion object {
         /** Mã yêu cầu của hộp chọn tệp; MainActivity chuyển kết quả về [onPicked]. */
         const val REQ_PICK = 7501
-        private const val PREFS = "truyentep_page"
-        private const val KEY_CODE = "room_code"
         private const val BG = 0xFF0D1224
         private const val CYAN = 0xFF00E5FF
         private const val DIM = 0xFF7F8BC0
     }
 
-    private val session = TruyenTepSession(act)
+    private val session: TruyenTepSession = run {
+        TruyenTepHub.init(act)
+        TruyenTepHub.instance!!
+    }
     private val uris = mutableListOf<Uri>()
     private var sending = false
 
@@ -65,6 +66,10 @@ class TruyenTepPage(private val act: Activity) : LinearLayout(act), TruyenTepSes
     private val newCodeBtn = Button(act).apply {
         text = "Đổi mã mới"
         setOnClickListener { newCode() }
+    }
+    private val photoBtn = Button(act).apply {
+        text = "Chụp ảnh & nhập chữ"
+        setOnClickListener { openPhotoScreen() }
     }
     private val pickBtn = Button(act).apply {
         text = "Chọn tệp"
@@ -101,6 +106,7 @@ class TruyenTepPage(private val act: Activity) : LinearLayout(act), TruyenTepSes
         addView(hintView, LinearLayout.LayoutParams(-1, -2))
         addView(statusView, LinearLayout.LayoutParams(-1, -2))
         addView(newCodeBtn, LinearLayout.LayoutParams(-1, -2))
+        addView(photoBtn, LinearLayout.LayoutParams(-1, -2))
         addView(pickBtn, LinearLayout.LayoutParams(-1, -2))
         addView(filesView, LinearLayout.LayoutParams(-1, -2))
         addView(sendBtn, LinearLayout.LayoutParams(-1, -2))
@@ -111,22 +117,12 @@ class TruyenTepPage(private val act: Activity) : LinearLayout(act), TruyenTepSes
         renderStatus(0)
     }
 
-    private fun currentCode(): String {
-        val prefs = act.getSharedPreferences(PREFS, Activity.MODE_PRIVATE)
-        prefs.getString(KEY_CODE, null)?.let { return it }
-        val c = (100000..999999).random().toString()
-        prefs.edit().putString(KEY_CODE, c).apply()
-        return c
-    }
+    private fun currentCode(): String = TruyenTepHub.currentCode(act)
 
     /** Gọi từ MainActivity: chỉ kết nối khi trang đang hiện và đã dừng hẳn ở trang này. */
     fun setActive(on: Boolean) {
-        if (on) {
-            if (!session.isRunning()) session.start(currentCode())
-            codeView.text = currentCode()
-        } else {
-            if (session.isRunning()) session.stop()
-        }
+        TruyenTepHub.setPageOn(on)
+        codeView.text = currentCode()
         renderStatus(session.connectedCount())
     }
 
@@ -146,11 +142,18 @@ class TruyenTepPage(private val act: Activity) : LinearLayout(act), TruyenTepSes
             Toast.makeText(act, "Không đổi mã khi đang có máy tính kết nối", Toast.LENGTH_SHORT).show()
             return
         }
-        val c = (100000..999999).random().toString()
-        act.getSharedPreferences(PREFS, Activity.MODE_PRIVATE).edit().putString(KEY_CODE, c).apply()
+        val c = TruyenTepHub.newCode(act)
         codeView.text = c
         if (session.isRunning()) session.changeRoomCode(c)
         Toast.makeText(act, "Đã đổi sang mã mới: $c", Toast.LENGTH_SHORT).show()
+    }
+
+    /** Mở màn hình chụp ảnh + nhập chữ (chép từ truyentep). Phiên vẫn chạy trong lúc màn hình đó hiện. */
+    private fun openPhotoScreen() {
+        act.startActivity(
+            Intent(act, PhotoCaptureActivity::class.java)
+                .putExtra(PhotoCaptureActivity.EXTRA_ROOM_CODE, currentCode())
+        )
     }
 
     private fun pick() {
