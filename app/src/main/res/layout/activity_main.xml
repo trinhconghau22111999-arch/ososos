@@ -10,6 +10,7 @@
         android:orientation="vertical">
 
         <ScrollView
+            android:id="@+id/homeScroll"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
@@ -18,6 +19,7 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:focusableInTouchMode="true"
                 android:orientation="vertical"
                 android:padding="18dp">
 
@@ -121,21 +123,25 @@
                     android:textSize="14sp"
                     android:textStyle="bold" />
 
-                <TextView
-                    android:id="@+id/searchBar"
+                <EditText
+                    android:id="@+id/search"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
                     android:fontFamily="sans-serif-condensed"
+                    android:hint="TÌM ỨNG DỤNG"
+                    android:imeOptions="actionSearch"
+                    android:inputType="text"
                     android:letterSpacing="0.12"
+                    android:maxLines="1"
                     android:padding="14dp"
-                    android:text="TÌM ỨNG DỤNG"
-                    android:textColor="#7F8BC0"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#7F8BC0"
                     android:textSize="14sp"
                     android:textStyle="bold" />
 
                 <GridLayout
-                    android:id="@+id/favGrid"
+                    android:id="@+id/appsGrid"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
@@ -152,40 +158,6 @@
             android:paddingLeft="14dp"
             android:paddingRight="14dp"
             android:paddingTop="6dp" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/drawer"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#0D1224"
-        android:orientation="vertical"
-        android:padding="16dp"
-        android:visibility="gone">
-
-        <EditText
-            android:id="@+id/search"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:fontFamily="sans-serif-condensed"
-            android:hint="TÌM ỨNG DỤNG"
-            android:inputType="text"
-            android:letterSpacing="0.1"
-            android:maxLines="1"
-            android:padding="14dp"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#7F8BC0"
-            android:textSize="15sp" />
-
-        <GridView
-            android:id="@+id/appGrid"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_marginTop="10dp"
-            android:layout_weight="1"
-            android:horizontalSpacing="4dp"
-            android:numColumns="4"
-            android:verticalSpacing="8dp" />
     </LinearLayout>
 
     <LinearLayout

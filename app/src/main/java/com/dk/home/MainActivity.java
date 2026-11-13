@@ -7,28 +7,26 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Color;
-import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
-import android.view.MotionEvent;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.BatteryManager;
 import android.os.Bundle;
-import android.provider.AlarmClock;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.BaseAdapter;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.GridLayout;
-import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -39,23 +37,21 @@ import java.util.List;
 
 public class MainActivity extends Activity {
 
-    static class App {
+    private static class Entry {
         CharSequence label;
         Drawable icon;
         ComponentName cn;
     }
 
     private PackageManager pm;
-    private AudioManager audio;
-    private View drawer;
     private EditText search;
     private TextView battery;
+    private GridLayout grid;
+    private ScrollView scroll;
     private View ccPanel, ccHeader, ccFooter;
     private ControlCenter cc;
     private float downY;
-    private final List<App> all = new ArrayList<>();
-    private final List<App> shown = new ArrayList<>();
-    private AppAdapter adapter;
+    private String signature = "";
 
     private int dp(int v) {
         return Math.round(v * getResources().getDisplayMetrics().density);
@@ -66,43 +62,27 @@ public class MainActivity extends Activity {
         super.onCreate(b);
         setContentView(R.layout.activity_main);
         pm = getPackageManager();
-        audio = (AudioManager) getSystemService(AUDIO_SERVICE);
-        drawer = findViewById(R.id.drawer);
         search = findViewById(R.id.search);
         battery = findViewById(R.id.battery);
+        grid = findViewById(R.id.appsGrid);
+        scroll = findViewById(R.id.homeScroll);
         ccPanel = findViewById(R.id.ccPanel);
         ccHeader = findViewById(R.id.ccHeader);
         ccFooter = findViewById(R.id.ccFooter);
+
         findViewById(R.id.clockPanel).setBackground(Ui.panel(this, Ui.GRID));
         findViewById(R.id.ctlBtn).setBackground(Ui.panel(this, Ui.ACCENT));
-        findViewById(R.id.searchBar).setBackground(Ui.panel(this, Ui.PLAIN));
-        search.setBackground(Ui.panel(this, Ui.ACCENT));
+        search.setBackground(Ui.panel(this, Ui.PLAIN));
         battery.setBackground(Ui.panel(this, Ui.HOT, 8));
 
-        findViewById(R.id.searchBar).setOnClickListener(v -> openDrawer());
-        buildFavorites();
         buildDock();
 
-        cc = new ControlCenter(this, (android.widget.GridLayout) findViewById(R.id.ccGrid),
+        cc = new ControlCenter(this, (GridLayout) findViewById(R.id.ccGrid),
                 (TextView) findViewById(R.id.ccInfo), this::closeCc);
         findViewById(R.id.ctlBtn).setOnClickListener(v -> openCc());
         ccFooter.setOnClickListener(v -> closeCc());
         findViewById(R.id.ccSettings).setOnClickListener(v -> go(new Intent(Settings.ACTION_SETTINGS)));
 
-        adapter = new AppAdapter();
-        GridView grid = findViewById(R.id.appGrid);
-        grid.setAdapter(adapter);
-        grid.setOnItemClickListener((p, v, pos, id) -> {
-            App a = shown.get(pos);
-            Intent i = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(a.cn);
-            go(i);
-            closeDrawer();
-        });
-        grid.setOnItemLongClickListener((p, v, pos, id) -> {
-            go(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                    Uri.parse("package:" + shown.get(pos).cn.getPackageName())));
-            return true;
-        });
         search.addTextChangedListener(new TextWatcher() {
             public void beforeTextChanged(CharSequence s, int a, int b2, int c) { }
             public void onTextChanged(CharSequence s, int a, int b2, int c) { filter(s.toString()); }
@@ -113,6 +93,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        reloadApps();
         Intent bat = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
         if (bat != null) {
             int level = bat.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
@@ -125,8 +106,9 @@ public class MainActivity extends Activity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        closeDrawer();
         closeCc();
+        resetSearch();
+        scroll.smoothScrollTo(0, 0);
     }
 
     @Override
@@ -134,6 +116,15 @@ public class MainActivity extends Activity {
         cc.release();
         super.onDestroy();
     }
+
+    @Override
+    public void onBackPressed() {
+        if (ccPanel.getVisibility() == View.VISIBLE) closeCc();
+        else resetSearch();
+        // Là màn hình chính nên không thoát khi nhấn Back
+    }
+
+    // ---------- Trung tâm điều khiển ----------
 
     private void openCc() {
         cc.refresh();
@@ -158,19 +149,12 @@ public class MainActivity extends Activity {
             float dy = e.getRawY() - downY;
             if (ccPanel.getVisibility() == View.VISIBLE) {
                 if (dy < -dp(90) && (hit(ccHeader, downY) || hit(ccFooter, downY))) closeCc();
-            } else if (drawer.getVisibility() != View.VISIBLE
+            } else if (scroll.getScrollY() == 0 && !search.hasFocus()
                     && downY < getResources().getDisplayMetrics().heightPixels * 0.4f && dy > dp(100)) {
                 openCc();
             }
         }
         return super.dispatchTouchEvent(e);
-    }
-
-    @Override
-    public void onBackPressed() {
-        if (ccPanel.getVisibility() == View.VISIBLE) closeCc();
-        else if (drawer.getVisibility() == View.VISIBLE) closeDrawer();
-        // Là màn hình chính nên không thoát khi nhấn Back
     }
 
     // ---------- Màn hình chính ----------
@@ -184,57 +168,38 @@ public class MainActivity extends Activity {
         }
     }
 
-    private Intent sel(String category) {
-        return Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, category);
+    private void resetSearch() {
+        search.setText("");
+        search.clearFocus();
+        InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+        imm.hideSoftInputFromWindow(search.getWindowToken(), 0);
     }
 
-    private View tile(final Intent intent, boolean accent) {
-        ResolveInfo ri = pm.resolveActivity(intent, 0);
-        if (ri == null) return null;
+    private LinearLayout makeTile(CharSequence label, Drawable icon, int iconDp, int style) {
         LinearLayout v = new LinearLayout(this);
         v.setOrientation(LinearLayout.VERTICAL);
         v.setGravity(Gravity.CENTER);
         v.setPadding(dp(2), dp(10), dp(2), dp(8));
-        v.setBackground(Ui.panel(this, accent ? Ui.ACCENT : Ui.PLAIN));
+        v.setBackground(Ui.panel(this, style));
         ImageView iv = new ImageView(this);
-        iv.setImageDrawable(ri.loadIcon(pm));
-        v.addView(iv, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        iv.setImageDrawable(icon);
+        v.addView(iv, new LinearLayout.LayoutParams(dp(iconDp), dp(iconDp)));
         TextView t = new TextView(this);
-        t.setText(Ui.up(ri.loadLabel(pm)));
+        t.setText(Ui.up(label));
+        t.setTextColor(Color.WHITE);
         Ui.style(t);
         t.setTextSize(10);
-        t.setTextColor(Color.WHITE);
-        t.setTextSize(11);
         t.setMaxLines(1);
         t.setEllipsize(TextUtils.TruncateAt.END);
         t.setGravity(Gravity.CENTER);
         t.setPadding(dp(2), dp(4), dp(2), 0);
         v.addView(t, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        v.setOnClickListener(x -> go(new Intent(intent)));
+        v.setTag(label.toString().toLowerCase());
         return v;
     }
 
-    private void buildFavorites() {
-        GridLayout g = findViewById(R.id.favGrid);
-        Intent[] list = {
-                sel(Intent.CATEGORY_APP_GALLERY),
-                sel(Intent.CATEGORY_APP_CONTACTS),
-                new Intent(AlarmClock.ACTION_SHOW_ALARMS),
-                sel(Intent.CATEGORY_APP_CALENDAR),
-                sel(Intent.CATEGORY_APP_CALCULATOR),
-                sel(Intent.CATEGORY_APP_MAPS),
-                sel(Intent.CATEGORY_APP_EMAIL),
-                new Intent(Settings.ACTION_SETTINGS)
-        };
-        for (Intent i : list) {
-            View t = tile(i, false);
-            if (t == null) continue;
-            GridLayout.LayoutParams lp = new GridLayout.LayoutParams(
-                    GridLayout.spec(GridLayout.UNDEFINED), GridLayout.spec(GridLayout.UNDEFINED, 1f));
-            lp.width = 0;
-            lp.setMargins(dp(3), dp(3), dp(3), dp(3));
-            g.addView(t, lp);
-        }
+    private Intent sel(String category) {
+        return Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, category);
     }
 
     private void buildDock() {
@@ -245,103 +210,64 @@ public class MainActivity extends Activity {
                 sel(Intent.CATEGORY_APP_BROWSER),
                 new Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
         };
-        for (Intent i : list) {
-            View t = tile(i, false);
-            if (t == null) continue;
+        for (final Intent i : list) {
+            ResolveInfo ri = pm.resolveActivity(i, 0);
+            if (ri == null) continue;
+            LinearLayout t = makeTile(ri.loadLabel(pm), ri.loadIcon(pm), 38, Ui.PLAIN);
+            t.setOnClickListener(x -> go(new Intent(i)));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
             lp.setMargins(dp(3), 0, dp(3), 0);
             dock.addView(t, lp);
         }
-        TextView all = new TextView(this);
-        all.setText("⋮⋮⋮\nTẤT CẢ");
-        Ui.style(all);
-        all.setGravity(Gravity.CENTER);
-        all.setTextColor(Ui.INK);
-        all.setTextSize(12);
-        all.setTypeface(null, android.graphics.Typeface.BOLD);
-        all.setBackground(Ui.panel(this, Ui.HERO));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
-        lp.setMargins(dp(3), 0, dp(3), 0);
-        all.setOnClickListener(v -> openDrawer());
-        dock.addView(all, lp);
     }
 
-    // ---------- Tất cả ứng dụng ----------
-
-    private void loadApps() {
-        all.clear();
+    /** Đưa toàn bộ ứng dụng lên màn hình chính. */
+    private void reloadApps() {
         Intent main = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
+        List<Entry> apps = new ArrayList<>();
+        StringBuilder sig = new StringBuilder();
         for (ResolveInfo ri : pm.queryIntentActivities(main, 0)) {
-            App a = new App();
-            a.label = ri.loadLabel(pm);
-            a.icon = ri.loadIcon(pm);
-            a.cn = new ComponentName(ri.activityInfo.packageName, ri.activityInfo.name);
-            all.add(a);
+            if (ri.activityInfo.packageName.equals(getPackageName())) continue;
+            Entry e = new Entry();
+            e.label = ri.loadLabel(pm);
+            e.cn = new ComponentName(ri.activityInfo.packageName, ri.activityInfo.name);
+            e.icon = ri.loadIcon(pm);
+            apps.add(e);
+            sig.append(e.cn.flattenToShortString()).append(';');
         }
-        Collections.sort(all, new Comparator<App>() {
-            public int compare(App x, App y) {
+        String s = sig.toString();
+        if (s.equals(signature) && grid.getChildCount() > 0) return;
+        signature = s;
+
+        Collections.sort(apps, new Comparator<Entry>() {
+            public int compare(Entry x, Entry y) {
                 return x.label.toString().compareToIgnoreCase(y.label.toString());
             }
         });
+        grid.removeAllViews();
+        for (final Entry e : apps) {
+            LinearLayout t = makeTile(e.label, e.icon, 38, Ui.PLAIN);
+            t.setOnClickListener(x -> go(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(e.cn)));
+            t.setOnLongClickListener(x -> {
+                go(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + e.cn.getPackageName())));
+                return true;
+            });
+            GridLayout.LayoutParams lp = new GridLayout.LayoutParams(
+                    GridLayout.spec(GridLayout.UNDEFINED), GridLayout.spec(GridLayout.UNDEFINED, 1f));
+            lp.width = 0;
+            lp.setMargins(dp(3), dp(3), dp(3), dp(3));
+            grid.addView(t, lp);
+        }
+        filter(search.getText().toString());
     }
 
     private void filter(String q) {
-        shown.clear();
         String k = q.trim().toLowerCase();
-        for (App a : all) {
-            if (k.isEmpty() || a.label.toString().toLowerCase().contains(k)) shown.add(a);
-        }
-        adapter.notifyDataSetChanged();
-    }
-
-    private void openDrawer() {
-        loadApps();
-        search.setText("");
-        filter("");
-        drawer.setVisibility(View.VISIBLE);
-    }
-
-    private void closeDrawer() {
-        if (drawer.getVisibility() != View.VISIBLE) return;
-        drawer.setVisibility(View.GONE);
-        android.view.inputmethod.InputMethodManager imm =
-                (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-        imm.hideSoftInputFromWindow(search.getWindowToken(), 0);
-    }
-
-    private class AppAdapter extends BaseAdapter {
-        public int getCount() { return shown.size(); }
-        public Object getItem(int p) { return shown.get(p); }
-        public long getItemId(int p) { return p; }
-
-        public View getView(int p, View convert, ViewGroup parent) {
-            LinearLayout v;
-            ImageView iv;
-            TextView t;
-            if (convert == null) {
-                v = new LinearLayout(MainActivity.this);
-                v.setOrientation(LinearLayout.VERTICAL);
-                v.setGravity(Gravity.CENTER);
-                v.setPadding(dp(2), dp(8), dp(2), dp(8));
-                iv = new ImageView(MainActivity.this);
-                v.addView(iv, new LinearLayout.LayoutParams(dp(44), dp(44)));
-                t = new TextView(MainActivity.this);
-                t.setTextColor(Color.WHITE);
-                t.setTextSize(11);
-                t.setMaxLines(2);
-                t.setEllipsize(TextUtils.TruncateAt.END);
-                t.setGravity(Gravity.CENTER);
-                t.setPadding(0, dp(4), 0, 0);
-                v.addView(t);
-            } else {
-                v = (LinearLayout) convert;
-                iv = (ImageView) v.getChildAt(0);
-                t = (TextView) v.getChildAt(1);
-            }
-            App a = shown.get(p);
-            iv.setImageDrawable(a.icon);
-            t.setText(a.label);
-            return v;
+        for (int i = 0; i < grid.getChildCount(); i++) {
+            View v = grid.getChildAt(i);
+            boolean ok = k.isEmpty() || String.valueOf(v.getTag()).contains(k);
+            v.setVisibility(ok ? View.VISIBLE : View.GONE);
         }
     }
 }
