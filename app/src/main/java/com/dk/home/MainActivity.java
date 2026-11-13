@@ -87,6 +87,7 @@ public class MainActivity extends Activity {
     private PackageManager pm;
     private EditText search;
     private TextView battery;
+    private TextView ramText;
     private TextView homeTitle;
     private static final String DEFAULT_TITLE = "HẬU OS";
     private GridLayout grid;
@@ -151,6 +152,7 @@ public class MainActivity extends Activity {
         pm = getPackageManager();
         search = findViewById(R.id.search);
         battery = findViewById(R.id.battery);
+        ramText = findViewById(R.id.ramText);
         grid = findViewById(R.id.appsGrid);
         scroll = findViewById(R.id.homeScroll);
         cols = Math.max(1, Math.min(4, getSharedPreferences(PREFS, MODE_PRIVATE).getInt("cols", 1)));
@@ -270,6 +272,22 @@ public class MainActivity extends Activity {
             if (level >= 0) battery.setText("● PIN " + (level * 100 / scale) + "%");
         }
         cc.refresh();
+        updateRam();
+    }
+
+    /** RAM đang dùng / tổng RAM (GB), cập nhật mỗi lần app hiện lại hoặc khi bấm vào chữ RAM. Không có vòng lặp nền. */
+    private void updateRam() {
+        if (ramText == null) return;
+        try {
+            android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE);
+            android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo();
+            am.getMemoryInfo(mi);
+            double gb = 1024.0 * 1024.0 * 1024.0;
+            double total = mi.totalMem / gb;
+            double used = (mi.totalMem - mi.availMem) / gb;
+            ramText.setText(String.format(Locale.US, "RAM %.1f/%.1fG", used, total));
+            ramText.setOnClickListener(v -> updateRam());
+        } catch (Exception ignored) { }
     }
 
     @Override
