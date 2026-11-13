@@ -531,6 +531,10 @@ public class MainActivity extends Activity {
             if (a0 == MotionEvent.ACTION_UP || a0 == MotionEvent.ACTION_CANCEL) ControlCenter.tileDragging = false;
             return r;
         }
+        // Chạm ra ngoài ô tìm kiếm: bỏ con trỏ (giữ nguyên chữ đã gõ) để vuốt chuyển trang được
+        if (e.getActionMasked() == MotionEvent.ACTION_DOWN && search.hasFocus() && !hitBox(search, e.getRawX(), e.getRawY())) {
+            dropSearchFocus();
+        }
         // Chụm / nở hai ngón tay trên màn hình chính để đổi số ứng dụng mỗi hàng
         if (pos == 0f && !dragging && customView == null) {
             if (e.getActionMasked() == MotionEvent.ACTION_DOWN) pinching = false;
@@ -679,6 +683,21 @@ public class MainActivity extends Activity {
         addPkgs(t, "com.google.android.calendar", "com.android.calendar", "com.samsung.android.calendar",
                 "com.coloros.calendar", "com.oplus.calendar", "com.miui.calendar", "com.huawei.calendar");
         if (!launchFirst(t)) Toast.makeText(this, "Không tìm thấy ứng dụng Lịch", Toast.LENGTH_SHORT).show();
+    }
+
+    private boolean hitBox(View v, float rawX, float rawY) {
+        int[] l = new int[2];
+        v.getLocationOnScreen(l);
+        return rawX >= l[0] && rawX <= l[0] + v.getWidth() && rawY >= l[1] && rawY <= l[1] + v.getHeight();
+    }
+
+    /** Bỏ con trỏ khỏi ô tìm kiếm và ẩn bàn phím, không xóa chữ. */
+    private void dropSearchFocus() {
+        homeRoot.setFocusableInTouchMode(true);   // để tiêu điểm chuyển sang đây, không quay lại ô tìm kiếm
+        search.clearFocus();
+        homeRoot.requestFocus();
+        InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+        if (imm != null) imm.hideSoftInputFromWindow(search.getWindowToken(), 0);
     }
 
     private void resetSearch() {
