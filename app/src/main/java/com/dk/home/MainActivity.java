@@ -160,6 +160,14 @@ public class MainActivity extends Activity {
         findViewById(R.id.date).setOnClickListener(v -> openCalendarApp());
         search.setBackground(Ui.panel(this, Ui.PLAIN));
         battery.setBackground(Ui.panel(this, Ui.HOT, 8));
+        // Bấm vào nhãn PIN: mở trang Pin trong Cài đặt
+        battery.setOnClickListener(v -> {
+            List<Intent> t = new ArrayList<>();
+            t.add(new Intent(Intent.ACTION_POWER_USAGE_SUMMARY));
+            t.add(new Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS));
+            t.add(new Intent(Settings.ACTION_SETTINGS));
+            if (!launchFirst(t)) Toast.makeText(this, "Không mở được trang Pin", Toast.LENGTH_SHORT).show();
+        });
 
         buildDock();
 
