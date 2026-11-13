@@ -1633,38 +1633,6 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
         }
     }
 
-    private fun takeScreenshot() {
-        if (incognitoOn) {
-            Toast.makeText(this, "Chụp màn hình không dùng được ở chế độ ẩn danh", Toast.LENGTH_SHORT).show()
-            return
-        }
-        val wv = active?.webView ?: return
-        if (wv.width <= 0 || wv.height <= 0) return
-        try {
-            val bmp = Bitmap.createBitmap(wv.width, wv.height, Bitmap.Config.ARGB_8888)
-            wv.draw(Canvas(bmp))
-            val name = "Webandr_" + System.currentTimeMillis() + ".png"
-            if (Build.VERSION.SDK_INT >= 29) {
-                val cv = ContentValues().apply {
-                    put(MediaStore.Images.Media.DISPLAY_NAME, name)
-                    put(MediaStore.Images.Media.MIME_TYPE, "image/png")
-                    put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Webandr")
-                }
-                val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv)
-                    ?: throw Exception("không tạo được tệp")
-                contentResolver.openOutputStream(uri)?.use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
-            } else {
-                val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "Webandr")
-                dir.mkdirs()
-                FileOutputStream(File(dir, name)).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
-                android.media.MediaScannerConnection.scanFile(this, arrayOf(File(dir, name).absolutePath), arrayOf("image/png"), null) /* để Ảnh/Tệp thấy ngay */
-            }
-            Toast.makeText(this, "Đã lưu ảnh chụp: Pictures/Webandr/$name", Toast.LENGTH_SHORT).show()
-        } catch (e: Exception) {
-            Toast.makeText(this, "Không chụp được: " + e.message, Toast.LENGTH_LONG).show()
-        }
-    }
-
     private fun rowAdapter(list: List<Array<String>>): android.widget.BaseAdapter = object : android.widget.BaseAdapter() {
             override fun getCount() = list.size
             override fun getItem(position: Int) = list[position]
