@@ -84,7 +84,7 @@ final class BrowserPage extends LinearLayout {
     private final List<Hist> hist = new ArrayList<>();
     private final List<String> searches = new ArrayList<>();
     /** Bật: chạm vào liên kết thì tự mở tab mới. Tắt: mở ngay trong tab hiện tại, chỉ nhấn giữ mới mở tab khác. */
-    private boolean newTabOnTap = true;
+    private boolean newTabOnTap = true;   // true = cho phép mở liên kết (bình thường); false = chạm vào liên kết không mở gì
     private ArrayAdapter<String> suggestAd;
 
     private final MainActivity act;
@@ -387,15 +387,12 @@ final class BrowserPage extends LinearLayout {
             public boolean shouldOverrideUrlLoading(WebView v, android.webkit.WebResourceRequest r) {
                 String u = r.getUrl().toString();
                 String low = u.toLowerCase();
-                if (newTabOnTap && r.isForMainFrame() && r.hasGesture() && !r.isRedirect()
-                        && (low.startsWith("http://") || low.startsWith("https://"))
-                        && tabs.size() < MAX_TABS) {
+                if (!newTabOnTap && r.isForMainFrame() && r.hasGesture() && !r.isRedirect()
+                        && (low.startsWith("http://") || low.startsWith("https://"))) {
                     WebView.HitTestResult h = v.getHitTestResult();
                     int ty = h == null ? 0 : h.getType();
-                    if (ty == WebView.HitTestResult.SRC_ANCHOR_TYPE || ty == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE) {
-                        newTab(u, true);   // chạm vào liên kết: mở tab mới
-                        return true;
-                    }
+                    // Đã tắt "cho phép mở liên kết": chạm vào liên kết không làm gì cả (chặn hẳn), chỉ nhấn giữ mới mở được
+                    if (ty == WebView.HitTestResult.SRC_ANCHOR_TYPE || ty == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE) return true;
                 }
                 return handleScheme(u);
             }
@@ -443,34 +440,8 @@ final class BrowserPage extends LinearLayout {
 
             @Override
             public boolean onCreateWindow(WebView v, boolean dialog, boolean userGesture, Message msg) {
-                if (!newTabOnTap) {
-                    // Tắt "tự mở tab mới": liên kết _blank / window.open cũng mở ngay trong tab hiện tại
-                    if (!userGesture) return false;
-                    WebView tmp = new WebView(act);
-                    final boolean[] done = {false};
-                    tmp.setWebViewClient(new WebViewClient() {
-                        private void here(WebView x, String u) {
-                            if (done[0]) return;
-                            done[0] = true;
-                            if (t.web != null && u != null && !u.isEmpty() && !u.equals("about:blank")) t.web.loadUrl(u);
-                            x.post(x::destroy);
-                        }
-
-                        @Override
-                        public boolean shouldOverrideUrlLoading(WebView x, android.webkit.WebResourceRequest rq) {
-                            here(x, rq.getUrl().toString());
-                            return true;
-                        }
-
-                        @Override
-                        public void onPageStarted(WebView x, String u, Bitmap ic) {
-                            here(x, u);
-                        }
-                    });
-                    ((WebView.WebViewTransport) msg.obj).setWebView(tmp);
-                    msg.sendToTarget();
-                    return true;
-                }
+                // Đã tắt "cho phép mở liên kết": chặn hẳn cửa sổ/tab mà trang tự bật lên (quảng cáo, popup...), không mở gì cả
+                if (!newTabOnTap) return false;
                 if (tabs.size() >= MAX_TABS) return false;
                 Tab n = newTab("", true);
                 WebView.WebViewTransport tr = (WebView.WebViewTransport) msg.obj;
@@ -711,7 +682,7 @@ final class BrowserPage extends LinearLayout {
         final AlertDialog d = new AlertDialog.Builder(act).setView(box).create();
         if (d.getWindow() != null) d.getWindow().setBackgroundDrawable(Ui.panel(act, Ui.GRID));
         CheckBox cb = new CheckBox(act);
-        cb.setText("Chạm vào liên kết thì tự mở tab mới");
+        cb.setText("Cho phép mở liên kết");
         cb.setTextColor(Color.WHITE);
         cb.setTextSize(14);
         cb.setButtonTintList(ColorStateList.valueOf(Ui.CYAN));
@@ -719,7 +690,7 @@ final class BrowserPage extends LinearLayout {
         cb.setOnCheckedChangeListener((b, on) -> { newTabOnTap = on; save(); });
         box.addView(cb);
         TextView note = new TextView(act);
-        note.setText("Bỏ chọn: chạm vào liên kết sẽ mở ngay trong tab hiện tại. Muốn mở tab khác thì nhấn giữ liên kết.");
+        note.setText("Đang bật: chạm vào liên kết mở bình thường trong trang, và cửa sổ/tab mà trang tự bật lên cũng được mở.\nBỏ chọn: chạm vào liên kết sẽ không mở gì cả (kể cả tab/cửa sổ trang tự bật). Muốn mở thì nhấn giữ liên kết, chọn \"Mở trong tab mới\".");
         note.setTextColor(Ui.DIM);
         note.setTextSize(12);
         note.setPadding(dp(4), dp(2), dp(4), dp(8));
