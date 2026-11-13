@@ -5,6 +5,7 @@
     android:background="#0D1224">
 
     <LinearLayout
+        android:id="@+id/homeRoot"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical">
@@ -118,7 +119,7 @@
                     android:gravity="center"
                     android:letterSpacing="0.14"
                     android:padding="13dp"
-                    android:text="▼  TRUNG TÂM ĐIỀU KHIỂN"
+                    android:text="▶  TRUNG TÂM ĐIỀU KHIỂN"
                     android:textColor="#00E5FF"
                     android:textSize="14sp"
                     android:textStyle="bold" />
@@ -165,6 +166,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="#0D1224"
+        android:clickable="true"
         android:orientation="vertical"
         android:paddingBottom="8dp"
         android:paddingLeft="14dp"
@@ -245,7 +247,7 @@
             android:gravity="center"
             android:letterSpacing="0.14"
             android:padding="14dp"
-            android:text="⌃  VUỐT LÊN HOẶC CHẠM ĐỂ ĐÓNG"
+            android:text="◀  VUỐT SANG TRÁI HOẶC CHẠM ĐỂ ĐÓNG"
             android:textColor="#7F8BC0"
             android:textSize="12sp"
             android:textStyle="bold" />

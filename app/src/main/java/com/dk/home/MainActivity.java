@@ -1,5 +1,6 @@
 package com.dk.home;
 
+import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Intent;
@@ -20,6 +21,7 @@ import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
@@ -48,9 +50,12 @@ public class MainActivity extends Activity {
     private TextView battery;
     private GridLayout grid;
     private ScrollView scroll;
-    private View ccPanel, ccHeader, ccFooter;
+    private View ccPanel, ccHeader, ccFooter, homeRoot;
     private ControlCenter cc;
-    private float downY;
+    private float downX, downY, startFrac, ccFrac;
+    private boolean tracking, dragging;
+    private int touchSlop;
+    private ValueAnimator anim;
     private String signature = "";
 
     private int dp(int v) {
@@ -69,6 +74,8 @@ public class MainActivity extends Activity {
         ccPanel = findViewById(R.id.ccPanel);
         ccHeader = findViewById(R.id.ccHeader);
         ccFooter = findViewById(R.id.ccFooter);
+        homeRoot = findViewById(R.id.homeRoot);
+        touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
 
         findViewById(R.id.clockPanel).setBackground(Ui.panel(this, Ui.GRID));
         findViewById(R.id.ctlBtn).setBackground(Ui.panel(this, Ui.ACCENT));
@@ -124,40 +131,88 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (ccPanel.getVisibility() == View.VISIBLE) closeCc();
+        if (ccFrac > 0f) closeCc();
         else resetSearch();
         // Là màn hình chính nên không thoát khi nhấn Back
     }
 
     // ---------- Trung tâm điều khiển ----------
 
+    private int screenW() {
+        return getResources().getDisplayMetrics().widthPixels;
+    }
+
+    /** frac = 0: trung tâm điều khiển nằm hẳn bên trái (ẩn), 1: hiện đầy màn hình. */
+    private void setCc(float frac) {
+        ccFrac = Math.max(0f, Math.min(1f, frac));
+        int w = screenW();
+        ccPanel.setTranslationX(-(1f - ccFrac) * w);
+        homeRoot.setTranslationX(ccFrac * w);
+        ccPanel.setVisibility(ccFrac > 0f ? View.VISIBLE : View.GONE);
+    }
+
+    private void animateCc(final boolean open) {
+        if (anim != null) anim.cancel();
+        if (open) cc.refresh();
+        anim = ValueAnimator.ofFloat(ccFrac, open ? 1f : 0f);
+        anim.setDuration(220);
+        anim.addUpdateListener(va -> setCc((Float) va.getAnimatedValue()));
+        anim.start();
+    }
+
     private void openCc() {
-        cc.refresh();
-        ccPanel.setVisibility(View.VISIBLE);
+        animateCc(true);
     }
 
     private void closeCc() {
-        ccPanel.setVisibility(View.GONE);
+        if (ccFrac > 0f) animateCc(false);
     }
 
-    private boolean hit(View v, float rawY) {
-        int[] l = new int[2];
-        v.getLocationOnScreen(l);
-        return rawY >= l[1] && rawY <= l[1] + v.getHeight();
-    }
-
+    /** Vuốt từ trái sang phải để kéo trung tâm điều khiển ra, vuốt ngược lại để đóng. */
     @Override
     public boolean dispatchTouchEvent(MotionEvent e) {
-        if (e.getAction() == MotionEvent.ACTION_DOWN) {
-            downY = e.getRawY();
-        } else if (e.getAction() == MotionEvent.ACTION_UP) {
-            float dy = e.getRawY() - downY;
-            if (ccPanel.getVisibility() == View.VISIBLE) {
-                if (dy < -dp(90) && (hit(ccHeader, downY) || hit(ccFooter, downY))) closeCc();
-            } else if (scroll.getScrollY() == 0 && !search.hasFocus()
-                    && downY < getResources().getDisplayMetrics().heightPixels * 0.4f && dy > dp(100)) {
-                openCc();
-            }
+        switch (e.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                if (anim != null) anim.cancel();
+                downX = e.getRawX();
+                downY = e.getRawY();
+                dragging = false;
+                startFrac = ccFrac;
+                tracking = ccFrac > 0f || !search.hasFocus();
+                break;
+            case MotionEvent.ACTION_MOVE:
+                if (tracking && !dragging) {
+                    float dx = e.getRawX() - downX, dy = e.getRawY() - downY;
+                    if (Math.abs(dx) > touchSlop * 2 && Math.abs(dx) > Math.abs(dy) * 1.5f) {
+                        boolean closedRight = ccFrac <= 0f && dx > 0;
+                        boolean openLeft = ccFrac > 0f && dx < 0;
+                        if (closedRight || openLeft || (ccFrac > 0f && ccFrac < 1f)) {
+                            dragging = true;
+                            startFrac = ccFrac;
+                            downX = e.getRawX();
+                            MotionEvent c = MotionEvent.obtain(e);
+                            c.setAction(MotionEvent.ACTION_CANCEL);
+                            super.dispatchTouchEvent(c);
+                            c.recycle();
+                        } else {
+                            tracking = false;
+                        }
+                    }
+                }
+                if (dragging) {
+                    setCc(startFrac + (e.getRawX() - downX) / screenW());
+                    return true;
+                }
+                break;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                if (dragging) {
+                    dragging = false;
+                    boolean open = startFrac < 0.5f ? ccFrac > 0.3f : ccFrac > 0.7f;
+                    animateCc(open);
+                    return true;
+                }
+                break;
         }
         return super.dispatchTouchEvent(e);
     }
