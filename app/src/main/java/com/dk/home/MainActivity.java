@@ -890,8 +890,8 @@ public class MainActivity extends Activity {
             LinearLayout t = makeTile(e.label, e.icon, iconDpFor(cols), Ui.PLAIN, textSpFor(cols));
             t.setOnClickListener(x -> go(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(e.cn)));
             t.setOnLongClickListener(x -> {
-                go(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                        Uri.parse("package:" + e.cn.getPackageName())));
+                x.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                showAppMenu(e);
                 return true;
             });
             GridLayout.LayoutParams lp = new GridLayout.LayoutParams(
@@ -901,6 +901,51 @@ public class MainActivity extends Activity {
             grid.addView(t, lp);
         }
         filter(search.getText().toString());
+    }
+
+    /** Nhấn giữ một ứng dụng: chọn xem thông tin hoặc quăng sang / gỡ khỏi trang Tiện ích. */
+    private void showAppMenu(final Entry e) {
+        final boolean pinned = cc.isPinned(e.cn);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(16), dp(16), dp(16), dp(10));
+
+        TextView title = new TextView(this);
+        title.setText(Ui.up(e.label));
+        title.setTextColor(Ui.CYAN);
+        title.setTextSize(16);
+        title.setPadding(0, 0, 0, dp(6));
+        Ui.style(title);
+        box.addView(title);
+
+        final AlertDialog d = new AlertDialog.Builder(this).setView(box).create();
+        if (d.getWindow() != null) d.getWindow().setBackgroundDrawable(Ui.panel(this, Ui.GRID));
+
+        String[] labels = {"Thông tin ứng dụng", pinned ? "Gỡ khỏi Tiện ích" : "Thêm vào Tiện ích"};
+        for (int i = 0; i < labels.length; i++) {
+            final int which = i;
+            TextView row = new TextView(this);
+            row.setText(Ui.up(labels[i]));
+            row.setTextColor(i == 1 && pinned ? Ui.PINK : Color.WHITE);
+            row.setTextSize(14);
+            row.setPadding(dp(4), dp(14), dp(4), dp(14));
+            Ui.style(row);
+            row.setOnClickListener(v -> {
+                d.dismiss();
+                if (which == 0) {
+                    go(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:" + e.cn.getPackageName())));
+                } else if (pinned) {
+                    cc.unpin(e.cn);
+                    Toast.makeText(this, "Đã gỡ khỏi Tiện ích", Toast.LENGTH_SHORT).show();
+                } else {
+                    cc.pin(e.cn);
+                    Toast.makeText(this, "Đã thêm vào Tiện ích", Toast.LENGTH_SHORT).show();
+                }
+            });
+            box.addView(row);
+        }
+        d.show();
     }
 
     private void filter(String q) {

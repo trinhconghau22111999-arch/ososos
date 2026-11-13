@@ -3,7 +3,13 @@ package com.dk.home;
 import android.accessibilityservice.AccessibilityService;
 import android.bluetooth.BluetoothAdapter;
 import android.app.Activity;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
+import android.graphics.drawable.Drawable;
+import android.text.TextUtils;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Configuration;
@@ -31,6 +37,7 @@ import android.graphics.PorterDuff;
 import android.graphics.drawable.GradientDrawable;
 import android.widget.ImageView;
 import android.widget.GridLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -349,6 +356,9 @@ final class ControlCenter {
         bind(pos, this::locationOn, () -> viaQs(Settings.ACTION_LOCATION_SOURCE_SETTINGS, "vị trí", "định vị", "location", "gps"));
         place(pos.root, 3, 3, 1, 1);
 
+        // Ứng dụng được "quăng sang" Tiện ích: xếp từ hàng 5 trở xuống
+        rebuildPinned();
+
         // Theo dõi trạng thái đèn pin
         try {
             cam = (CameraManager) a.getSystemService(Context.CAMERA_SERVICE);
@@ -372,6 +382,92 @@ final class ControlCenter {
             };
             cam.registerTorchCallback(torchCb, null);
         } catch (Exception ignored) { }
+    }
+
+    // ---------- Ứng dụng ghim vào Tiện ích ----------
+
+    private static final String PREFS = "hauos", KEY_PINNED = "cc_pinned";
+    private static final int PIN_ROW = 4;
+    private final List<View> pinnedViews = new ArrayList<>();
+
+    private List<ComponentName> pinnedList() {
+        List<ComponentName> out = new ArrayList<>();
+        String raw = a.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_PINNED, "");
+        for (String part : raw.split("\n")) {
+            if (part.isEmpty()) continue;
+            ComponentName cn = ComponentName.unflattenFromString(part);
+            if (cn != null) out.add(cn);
+        }
+        return out;
+    }
+
+    private void savePinned(List<ComponentName> list) {
+        StringBuilder sb = new StringBuilder();
+        for (ComponentName cn : list) sb.append(cn.flattenToString()).append('\n');
+        a.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_PINNED, sb.toString()).apply();
+    }
+
+    boolean isPinned(ComponentName cn) {
+        return pinnedList().contains(cn);
+    }
+
+    void pin(ComponentName cn) {
+        List<ComponentName> l = pinnedList();
+        if (!l.contains(cn)) l.add(cn);
+        savePinned(l);
+        rebuildPinned();
+    }
+
+    void unpin(ComponentName cn) {
+        List<ComponentName> l = pinnedList();
+        l.remove(cn);
+        savePinned(l);
+        rebuildPinned();
+    }
+
+    private void rebuildPinned() {
+        for (View v : pinnedViews) grid.removeView(v);
+        pinnedViews.clear();
+        PackageManager pm = a.getPackageManager();
+        int idx = 0;
+        for (final ComponentName cn : pinnedList()) {
+            CharSequence label;
+            Drawable icon;
+            try {
+                ActivityInfo ai = pm.getActivityInfo(cn, 0);
+                label = ai.loadLabel(pm);
+                icon = ai.loadIcon(pm);
+            } catch (Exception e) {
+                continue;   // ứng dụng đã bị gỡ
+            }
+            LinearLayout t = new LinearLayout(a);
+            t.setOrientation(LinearLayout.VERTICAL);
+            t.setGravity(Gravity.CENTER);
+            t.setPadding(dp(2), dp(6), dp(2), dp(6));
+            t.setBackground(Ui.panel(a, Ui.PLAIN));
+            ImageView iv = new ImageView(a);
+            iv.setImageDrawable(icon);
+            t.addView(iv, new LinearLayout.LayoutParams(dp(40), dp(40)));
+            TextView tv = new TextView(a);
+            tv.setText(Ui.up(label));
+            tv.setTextColor(WHITE);
+            Ui.style(tv);
+            tv.setTextSize(9);
+            tv.setMaxLines(1);
+            tv.setEllipsize(TextUtils.TruncateAt.END);
+            tv.setGravity(Gravity.CENTER);
+            tv.setPadding(dp(2), dp(4), dp(2), 0);
+            t.addView(tv, new LinearLayout.LayoutParams(-1, -2));
+            t.setOnClickListener(v -> go(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(cn)));
+            t.setOnLongClickListener(v -> {
+                unpin(cn);
+                Toast.makeText(a, "Đã gỡ khỏi Tiện ích", Toast.LENGTH_SHORT).show();
+                return true;
+            });
+            place(t, PIN_ROW + idx / 4, idx % 4, 1, 1);
+            pinnedViews.add(t);
+            idx++;
+        }
     }
 
     void refresh() {
