@@ -670,7 +670,7 @@ class PhotoCaptureActivity : AppCompatActivity() {
             textTimestampOverlay.visibility = View.GONE
         }
         if (timestampOn) {
-            btnTimestamp.setColorFilter(0xFFFF6B00.toInt())
+            btnTimestamp.setColorFilter(0xFF00E5FF.toInt())
             btnTimestamp.alpha = 1f
         } else {
             btnTimestamp.clearColorFilter()
@@ -729,7 +729,7 @@ class PhotoCaptureActivity : AppCompatActivity() {
             paint.color = android.graphics.Color.BLACK
             canvas.drawText(text, x, y, paint)
             paint.style = android.graphics.Paint.Style.FILL
-            paint.color = 0xFFFF9800.toInt()
+            paint.color = 0xFF00E5FF.toInt()
             canvas.drawText(text, x, y, paint)
 
             val out = java.io.ByteArrayOutputStream()

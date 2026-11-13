@@ -98,7 +98,7 @@
             android:paddingEnd="6dp"
             android:text="@string/btn_send_file"
             android:textAllCaps="true"
-            android:textColor="#FF6B00"
+            android:textColor="#00E5FF"
             android:textSize="12sp" />
 
     </LinearLayout>
