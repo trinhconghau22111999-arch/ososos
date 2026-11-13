@@ -130,7 +130,7 @@
         android:shadowDx="0"
         android:shadowDy="0"
         android:shadowRadius="4"
-        android:textColor="#FF9800"
+        android:textColor="#00E5FF"
         android:textSize="14sp"
         android:textStyle="bold"
         android:visibility="gone"
