@@ -1,5 +1,6 @@
 plugins {
     id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
 }
 
 android {
@@ -18,4 +19,15 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    // Trang Điều khiển: Firebase (tín hiệu) + WebRTC (kênh lệnh), cùng phiên bản với repo cha
+    implementation platform('com.google.firebase:firebase-bom:33.1.2')
+    implementation 'com.google.firebase:firebase-database-ktx'
+    implementation 'io.github.webrtc-sdk:android:125.6422.06.1'
 }
