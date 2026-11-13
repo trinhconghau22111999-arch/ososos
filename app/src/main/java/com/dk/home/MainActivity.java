@@ -20,6 +20,10 @@ import android.media.AudioManager;
 import android.net.Uri;
 import android.os.BatteryManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
+import android.webkit.JavascriptInterface;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.text.Editable;
@@ -296,6 +300,7 @@ public class MainActivity extends Activity {
         ws.setLoadWithOverviewMode(true);
         CookieManager.getInstance().setAcceptCookie(true);
         yt.setBackgroundColor(0xFF0D1224);
+        yt.addJavascriptInterface(new AdBridge(), "HauOsAd");
         yt.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView v, String url, android.graphics.Bitmap icon) {
@@ -334,6 +339,42 @@ public class MainActivity extends Activity {
 
     private String themeJs;
 
+    private String readAsset(String name) {
+        try {
+            StringBuilder sb = new StringBuilder();
+            BufferedReader r = new BufferedReader(new InputStreamReader(getAssets().open(name), "UTF-8"));
+            String line;
+            while ((line = r.readLine()) != null) sb.append(line).append('\n');
+            r.close();
+            return sb.toString();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /** Cầu nối JS -> app: trang báo toạ độ nút "Bỏ qua quảng cáo", app gửi cú chạm thật vào đó. */
+    private class AdBridge {
+        @JavascriptInterface
+        public void skip(final float x, final float y, final float dpr) {
+            runOnUiThread(() -> tapYoutube(x * dpr, y * dpr));
+        }
+    }
+
+    private void tapYoutube(final float x, final float y) {
+        if (yt == null || pos != -1f) return;           // chỉ khi màn hình YouTube đang hiện
+        String u = yt.getUrl();
+        if (u == null || !u.contains("youtube.com")) return;
+        final long t = SystemClock.uptimeMillis();
+        MotionEvent d = MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, x, y, 0);
+        yt.dispatchTouchEvent(d);
+        d.recycle();
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            MotionEvent up = MotionEvent.obtain(t, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, x, y, 0);
+            yt.dispatchTouchEvent(up);
+            up.recycle();
+        }, 70);
+    }
+
     /** Phủ giao diện gaming (assets/yt_theme.css) lên trang YouTube. */
     private void injectTheme(WebView v) {
         try {
@@ -343,7 +384,7 @@ public class MainActivity extends Activity {
                 String line;
                 while ((line = r.readLine()) != null) sb.append(line).append('\n');
                 r.close();
-                themeJs = "(function(){var id='hauos-theme',s=document.getElementById(id);"
+                themeJs = readAsset("yt_adskip.js") + "\n(function(){var id='hauos-theme',s=document.getElementById(id);"
                         + "if(!s){s=document.createElement('style');s.id=id;(document.head||document.documentElement).appendChild(s);}"
                         + "s.textContent=" + JSONObject.quote(sb.toString()) + ";})();";
             }
