@@ -409,12 +409,23 @@ public class TvPage extends FrameLayout {
 
     private TextView title(String text) {
         TextView t = new TextView(getContext());
-        t.setText(text);
-        t.setTextSize(24f);
-        t.setTextColor(GOLD);
-        t.setTypeface(Typeface.DEFAULT_BOLD);
-        t.setPadding(dp(16), 0, 0, dp(10));
+        t.setText(Ui.up(text));
+        t.setTextSize(20f);
+        t.setTextColor(0xFF00E5FF);
+        Ui.style(t);
+        t.setLetterSpacing(0.14f);
+        t.setPadding(dp(4), 0, 0, dp(8));
         return t;
+    }
+
+    /** Đường kẻ gradient dưới tiêu đề, giống các trang khác. */
+    private View rule() {
+        View v = new View(getContext());
+        v.setBackgroundResource(R.drawable.bg_rule);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(2));
+        lp.bottomMargin = dp(8);
+        v.setLayoutParams(lp);
+        return v;
     }
 
     private ListView mkList() {
@@ -423,8 +434,8 @@ public class TvPage extends FrameLayout {
         l.setDivider(null);
         l.setDividerHeight(dp(4));
         GradientDrawable sel = new GradientDrawable();
-        sel.setColor(Color.BLACK);
-        sel.setStroke(dp(4), BLUE);
+        sel.setColor(0xFF0A3B4D);
+        sel.setStroke(dp(2), 0xFF00E5FF);
         sel.setCornerRadius(dp(10));
         l.setSelector(sel);
         l.setVerticalScrollBarEnabled(false);
@@ -542,7 +553,7 @@ public class TvPage extends FrameLayout {
         // bảng chọn kênh: trái = đài, phải = kênh
         overlay = new LinearLayout(c);
         overlay.setOrientation(LinearLayout.HORIZONTAL);
-        overlay.setBackgroundColor(Color.BLACK);
+        overlay.setBackgroundColor(0xFF0D1224);
         overlay.setPadding(dp(40), dp(28), dp(40), dp(16));
         overlay.setVisibility(View.GONE);
 
@@ -616,7 +627,8 @@ public class TvPage extends FrameLayout {
         LinearLayout left = new LinearLayout(c);
         leftCol = left;
         left.setOrientation(LinearLayout.VERTICAL);
-        left.addView(title("ĐÀI"));
+        left.addView(title("TV của tôi"));
+        left.addView(rule());
         left.addView(groupList, new LinearLayout.LayoutParams(-1, 0, 1f));
         rightTitle = title("");
         LinearLayout right = new LinearLayout(c);
@@ -624,6 +636,7 @@ public class TvPage extends FrameLayout {
         right.setOrientation(LinearLayout.VERTICAL);
         right.setPadding(narrow ? 0 : dp(28), 0, 0, 0);
         right.addView(rightTitle);
+        right.addView(rule());
         right.addView(chList, new LinearLayout.LayoutParams(-1, 0, 1f));
         // màn hình hẹp (điện thoại dọc): chỉ hiện 1 cột tại một thời điểm để thấy đủ tên kênh
         overlay.addView(left, new LinearLayout.LayoutParams(0, -1, narrow ? 1f : 3f));
