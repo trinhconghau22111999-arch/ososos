@@ -69,6 +69,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.dk.home.remote.RemotePage;
+import com.dk.home.truyentep.TruyenTepPage;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -116,6 +117,10 @@ public class MainActivity extends Activity {
     private BrowserHost webandr;
     private static final String KEY_WEBANDR = "browser_webandr";
     private boolean useWebandr;
+    // Trang "Truyền tệp" (chép từ truyentep): nằm bên TRÁI Duyệt web, chỉ kết nối khi đang mở trang này.
+    private TruyenTepPage truyen;
+    private boolean truyenActive;
+    private boolean appPaused;
     private AiAssistant ai;
     private boolean brActive;
     private View customView;
@@ -183,6 +188,9 @@ public class MainActivity extends Activity {
         brPanel = findViewById(R.id.brPanel);
         br = new BrowserPage(this);
         ((ViewGroup) brPanel).addView(br, new FrameLayout.LayoutParams(-1, -1));
+        truyen = new TruyenTepPage(this);
+        ((ViewGroup) brPanel.getParent()).addView(truyen, new FrameLayout.LayoutParams(-1, -1));
+        truyen.setVisibility(View.INVISIBLE);
         useWebandr = getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(KEY_WEBANDR, false);
         if (useWebandr) applyBrowserEngine();
         touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
@@ -245,6 +253,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        appPaused = false;
+        syncTruyen();
         if (yt != null) yt.onResume();
         if (tv != null) tv.onAppResume();
         if (rc != null) rc.setActive(rcActive);
@@ -314,6 +324,8 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        appPaused = true;
+        syncTruyen();
         if (ai != null) ai.cancel();
         if (yt != null) yt.onPause();
         if (tv != null) tv.onAppPause();
@@ -340,6 +352,10 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == TruyenTepPage.REQ_PICK) {
+            if (truyen != null) truyen.onPicked(data);
+            return;
+        }
         if (webandr != null && webandr.handleActivityResult(requestCode, resultCode, data)) return;
         if (requestCode == RemotePage.REQ_VOICE) {
             if (rc != null) rc.onVoiceResult(resultCode, data);
@@ -378,6 +394,8 @@ public class MainActivity extends Activity {
         }
         if (pos < 0f) {
             if (yt.canGoBack()) yt.goBack(); else animateTo(0f);
+        } else if (pos > 2.5f) {
+            animateTo(2f);   // Truyền tệp: Back về trình duyệt
         } else if (pos > 1f) {
             // trình duyệt: lùi trang, hết lịch sử thì về trang Tiện ích
             boolean handled = useWebandr && webandr != null ? webandr.back() : br.onBack();
@@ -398,7 +416,7 @@ public class MainActivity extends Activity {
 
     /** p = 1: trung tâm điều khiển (trái) hiện hẳn; 0: màn hình chính; -1: YouTube (phải) hiện hẳn. */
     private void setPos(float p) {
-        pos = Math.max(-3f, Math.min(2f, p));
+        pos = Math.max(-3f, Math.min(3f, p));
         int w = screenW();
         homeRoot.setTranslationX(pos * w);
         ccPanel.setTranslationX((pos - 1f) * w);
@@ -406,6 +424,7 @@ public class MainActivity extends Activity {
         tvPanel.setTranslationX((pos + 2f) * w);
         rcPanel.setTranslationX((pos + 3f) * w);
         brPanel.setTranslationX((pos - 2f) * w);
+        if (truyen != null) truyen.setTranslationX((pos - 3f) * w);
         int cv = pos > 0f ? View.VISIBLE : View.INVISIBLE;
         int yv = pos < 0f ? View.VISIBLE : View.INVISIBLE;
         int tvv = pos < -1f ? View.VISIBLE : View.INVISIBLE;
@@ -416,6 +435,10 @@ public class MainActivity extends Activity {
         if (rcPanel.getVisibility() != rv) rcPanel.setVisibility(rv);
         int bv = pos > 1f ? View.VISIBLE : View.INVISIBLE;
         if (brPanel.getVisibility() != bv) brPanel.setVisibility(bv);
+        if (truyen != null) {
+            int truv = pos > 2f ? View.VISIBLE : View.INVISIBLE;
+            if (truyen.getVisibility() != truv) truyen.setVisibility(truv);
+        }
         boolean brAct = pos >= 1.98f;
         if (br != null && brAct != brActive) {
             brActive = brAct;
@@ -434,6 +457,17 @@ public class MainActivity extends Activity {
             rcActive = rcAct;
             rc.setActive(rcAct);
         }
+        syncTruyen();
+    }
+
+    /** Trang Truyền tệp chỉ kết nối khi đang dừng hẳn ở trang đó và app đang hiện (không chạy nền). */
+    private void syncTruyen() {
+        if (truyen == null) return;
+        boolean on = !appPaused && Math.abs(pos - 3f) < 0.02f;
+        if (on != truyenActive) {
+            truyenActive = on;
+            truyen.setActive(on);
+        }
     }
 
     /** Bật layer phần cứng khi đang vuốt/chuyển trang để trượt mượt, tắt lại khi xong. */
@@ -445,6 +479,7 @@ public class MainActivity extends Activity {
         if (tvPanel.getLayerType() != t) tvPanel.setLayerType(t, null);
         if (rcPanel.getLayerType() != t) rcPanel.setLayerType(t, null);
         if (brPanel.getLayerType() != t) brPanel.setLayerType(t, null);
+        if (truyen != null && truyen.getLayerType() != t) truyen.setLayerType(t, null);
     }
 
     private void animateTo(final float target) {
@@ -788,7 +823,8 @@ public class MainActivity extends Activity {
                     float dx = e.getRawX() - downX, dy = e.getRawY() - downY;
                     if (Math.abs(dx) > touchSlop * 2 && Math.abs(dx) > Math.abs(dy) * 1.5f) {
                         boolean ok;
-                        if (pos >= 2f) ok = dx < 0 && br.canSwipeBack(downX, downY, screenW());   // trình duyệt
+                        if (pos >= 3f) ok = dx < 0;              // Truyền tệp: vuốt trái về trình duyệt
+                        else if (pos >= 2f) ok = dx > 0 || (dx < 0 && br.canSwipeBack(downX, downY, screenW()));   // trình duyệt: vuốt phải sang Truyền tệp, vuốt trái về Tiện ích
                         else if (pos >= 1f) ok = true;           // trang Tiện ích: vuốt phải mở trình duyệt, vuốt trái về chính
                         else if (pos <= -3f) ok = dx > 0;
                         else if (pos <= -2f) ok = true;          // trang TV: vuốt được cả hai chiều
@@ -801,8 +837,8 @@ public class MainActivity extends Activity {
                             dragging = true;
                             startPos = pos;
                             boolean positive = pos > 0f || (pos == 0f && dx > 0);
-                            dragLo = positive ? (pos > 1.5f ? 1f : 0f) : -3f;
-                            dragHi = positive ? (pos > 0.5f ? 2f : 1f) : 0f;
+                            dragLo = positive ? (pos > 2.5f ? 2f : (pos > 1.5f ? 1f : 0f)) : -3f;
+                            dragHi = positive ? (pos > 1.5f ? 3f : (pos > 0.5f ? 2f : 1f)) : 0f;
                             layers(true);
                             downX = e.getRawX();
                             MotionEvent c = MotionEvent.obtain(e);
@@ -839,12 +875,12 @@ public class MainActivity extends Activity {
                         float moved = pos - startPage;
                         target = Math.abs(moved) > 0.3f ? startPage + Math.signum(moved) : startPage;
                     }
-                    target = Math.max(-3f, Math.min(2f, target));
+                    target = Math.max(-3f, Math.min(3f, target));
                     animateTo(target, vx);
                     return true;
                 }
                 // Chạm giữa lúc đang trượt làm hoạt ảnh bị huỷ: không để trang kẹt lưng chừng
-                if (pos != 0f && pos != 1f && pos != 2f && pos != -1f && pos != -2f && pos != -3f) animateTo(Math.round(pos));
+                if (pos != 0f && pos != 1f && pos != 2f && pos != 3f && pos != -1f && pos != -2f && pos != -3f) animateTo(Math.round(pos));
                 break;
         }
         return super.dispatchTouchEvent(e);
