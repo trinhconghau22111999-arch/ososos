@@ -284,25 +284,11 @@ final class BrowserPage extends LinearLayout {
             newTab(HOME, true);
         });
         tabRow.addView(add, new LayoutParams(-2, -1));
-        TextView dl = new TextView(act);
-        dl.setText("↓ Tải xuống");
-        dl.setTextColor(LINK);
-        dl.setTextSize(14);
-        dl.setGravity(Gravity.CENTER_VERTICAL);
-        dl.setPadding(dp(10), 0, dp(14), 0);
-        dl.setOnClickListener(v -> {
-            try {
-                act.startActivity(new Intent(DownloadManager.ACTION_VIEW_DOWNLOADS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            } catch (Exception e) {
-                Toast.makeText(act, "Không mở được mục Tải xuống", Toast.LENGTH_SHORT).show();
-            }
-        });
-        tabRow.addView(dl, new LayoutParams(-2, -1));
         refreshChips();
     }
 
     private void refreshChips() {
-        for (int i = 0; i < tabs.size() && i < tabRow.getChildCount() - 2; i++) {
+        for (int i = 0; i < tabs.size() && i < tabRow.getChildCount() - 1; i++) {
             Tab t = tabs.get(i);
             boolean on = i == cur;
             LinearLayout cell = (LinearLayout) tabRow.getChildAt(i);
