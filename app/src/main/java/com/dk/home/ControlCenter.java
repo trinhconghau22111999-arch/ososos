@@ -307,7 +307,7 @@ final class ControlCenter {
         });
         place(volume, 1, 3, 2, 1);
 
-        // Hàng 3: Bluetooth, máy bay, điểm phát sóng, khóa xoay
+        // Hàng 3: Bluetooth, khóa xoay, đèn pin, vị trí
         Tile bt = tile(R.drawable.ic_bluetooth, "Bluetooth", "", false);
         bind(bt, () -> {
             try {
@@ -324,15 +324,6 @@ final class ControlCenter {
         });
         place(bt.root, 3, 0, 1, 1);
 
-        Tile air = tile(R.drawable.ic_airplane, "Máy bay", "", false);
-        bind(air, () -> Settings.Global.getInt(a.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 0) == 1,
-                () -> viaQs(Settings.ACTION_AIRPLANE_MODE_SETTINGS, "chế độ máy bay", "máy bay", "airplane", "flight mode"));
-        place(air.root, 3, 1, 1, 1);
-
-        Tile hot = tile(R.drawable.ic_hotspot, "Phát Wi-Fi", "", false);
-        bind(hot, null, () -> viaQs(Settings.ACTION_WIRELESS_SETTINGS, "điểm phát sóng", "phát wi-fi", "điểm phát wi-fi", "hotspot", "điểm truy cập"));
-        place(hot.root, 3, 2, 1, 1);
-
         Tile rot = tile(R.drawable.ic_rotate_lock, "Khóa xoay", "", false);
         bind(rot, () -> Settings.System.getInt(a.getContentResolver(), Settings.System.ACCELEROMETER_ROTATION, 1) == 0, () -> {
             if (!Settings.System.canWrite(a)) { askedWrite = false; askWrite(); return; }
@@ -340,33 +331,9 @@ final class ControlCenter {
             Settings.System.putInt(a.getContentResolver(), Settings.System.ACCELEROMETER_ROTATION, cur == 1 ? 0 : 1);
             refresh();
         });
-        place(rot.root, 3, 3, 1, 1);
+        place(rot.root, 3, 1, 1, 1);
 
         // Hàng 4: chụp màn hình, chế độ tối, tiết kiệm pin, đèn pin
-        Tile shot = tile(R.drawable.ic_screenshot, "Chụp màn hình", "", false);
-        bind(shot, null, () -> {
-            if (ScreenshotService.instance != null) {
-                closer.run();
-                new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                    if (ScreenshotService.instance != null)
-                        ScreenshotService.instance.performGlobalAction(AccessibilityService.GLOBAL_ACTION_TAKE_SCREENSHOT);
-                }, 500);
-            } else {
-                Toast.makeText(a, "Bật \"Hậu OS - Chụp màn hình\" trong Hỗ trợ tiếp cận", Toast.LENGTH_LONG).show();
-                go(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
-            }
-        });
-        place(shot.root, 4, 0, 1, 1);
-
-        Tile dark = tile(R.drawable.ic_dark, "Chế độ tối", "", false);
-        bind(dark, () -> (a.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
-                == Configuration.UI_MODE_NIGHT_YES, () -> viaQs(Settings.ACTION_DISPLAY_SETTINGS, "chế độ tối", "giao diện tối", "dark mode", "dark"));
-        place(dark.root, 4, 1, 1, 1);
-
-        Tile saver = tile(R.drawable.ic_battery, "Tiết kiệm pin", "", false);
-        bind(saver, () -> power.isPowerSaveMode(), () -> viaQs(Settings.ACTION_BATTERY_SAVER_SETTINGS, "tiết kiệm pin", "tiết kiệm điện", "battery saver", "power saving"));
-        place(saver.root, 4, 2, 1, 1);
-
         Tile torch = tile(R.drawable.ic_flashlight, "Đèn pin", "", false);
         bind(torch, () -> torchOn, () -> {
             if (torchId == null) {
@@ -375,16 +342,12 @@ final class ControlCenter {
             }
             try { cam.setTorchMode(torchId, !torchOn); } catch (Exception ignored) { }
         });
-        place(torch.root, 4, 3, 1, 1);
+        place(torch.root, 3, 2, 1, 1);
 
         // Hàng 5: vị trí, bảo vệ mắt
         Tile pos = tile(R.drawable.ic_location, "Vị trí", "", false);
         bind(pos, this::locationOn, () -> viaQs(Settings.ACTION_LOCATION_SOURCE_SETTINGS, "vị trí", "định vị", "location", "gps"));
-        place(pos.root, 5, 0, 1, 1);
-
-        Tile eye = tile(R.drawable.ic_eye, "Bảo vệ mắt", "", false);
-        bind(eye, null, () -> viaQs(Settings.ACTION_DISPLAY_SETTINGS, "bảo vệ mắt", "eye comfort", "eye protection", "chế độ đọc"));
-        place(eye.root, 5, 1, 1, 1);
+        place(pos.root, 3, 3, 1, 1);
 
         // Theo dõi trạng thái đèn pin
         try {
