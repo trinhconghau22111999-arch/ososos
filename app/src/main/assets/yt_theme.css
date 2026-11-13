@@ -105,3 +105,21 @@ ytm-search-box, .searchbox-input, input[type="text"], input[type="search"] {
 
 /* Thanh cuộn */
 ::-webkit-scrollbar { width: 0; height: 0; }
+
+/* Ẩn thanh chip lọc (Tất cả / Âm nhạc ...) và thanh điều hướng dưới (Trang chủ / Shorts / Bạn) */
+ytm-feed-filter-chip-bar-renderer,
+ytm-chip-cloud-renderer,
+ytm-chip-cloud-chip-renderer,
+yt-chip-cloud-renderer,
+chip-bar-view-model,
+[class*="chip-cloud"],
+[class*="filter-chip-bar"],
+ytm-pivot-bar-renderer,
+ytm-pivot-bar-item-renderer,
+.pivot-bar-item-tab,
+[class*="pivot-bar"] {
+  display: none !important;
+}
+ytm-app, #app, ytm-browse, body {
+  padding-bottom: 0 !important;
+}
