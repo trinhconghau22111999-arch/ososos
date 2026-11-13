@@ -11,8 +11,29 @@ android {
         applicationId "com.dk.home"
         minSdk 24
         targetSdk 28
-        versionCode 1
-        versionName "1.0"
+        // Mỗi lần CI build số phiên bản tăng lên (run number), nên APK mới luôn cài đè được bản cũ
+        def run = (System.getenv("GITHUB_RUN_NUMBER") ?: "0") as int
+        versionCode run + 2
+        versionName "1.0.${run + 2}"
+    }
+
+    // Cùng một khóa ký cho mọi lần build => cập nhật đè lên bản cũ, không phải gỡ app
+    signingConfigs {
+        hauos {
+            storeFile file('hauos.jks')
+            storePassword 'hauos123'
+            keyAlias 'hauos'
+            keyPassword 'hauos123'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.hauos
+        }
+        release {
+            signingConfig signingConfigs.hauos
+        }
     }
 
     compileOptions {
