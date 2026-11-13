@@ -62,9 +62,8 @@ private const val PHOTO_SEND_JPEG_QUALITY = 80
  * - Nut xem anh vua chup (ben trai nut chup) - CHI hien sau khi chup it
  *   nhat 1 tam trong phien nay, mac dinh an
  * - Nut bat/tat flash (gan canh phai man hinh)
- * - KHONG con nut thoat rieng (goc tren-trai) - bam Back (nut he thong) se THOAT HAN
- *   app va NGAT KET NOI luon (xem onBackPressed / exitAppAndDisconnect), thay vi chi
- *   dua app xuong nen nhu thiet ke cu.
+ * - KHONG con nut thoat rieng (goc tren-trai) - bam Back (nut he thong) se dong
+ *   man hinh nay va quay ve trang Truyen tep cua app (xem onBackPressed), khong thoat app.
  * - Man hinh (khung ngam + man xem lai) luon nam o doan giua man hinh, khong con
  *   tran vien nhu truoc.
  * - Khi chup: CHI luu anh xuong may (MediaStore, thu muc Pictures/QrTruyenTep) -
@@ -209,8 +208,8 @@ class PhotoCaptureActivity : AppCompatActivity() {
         }
 
         // Man hinh nay gio la man hinh chinh duy nhat cua app (thay cho CameraActivity
-        // truoc day). KHONG con nut thoat rieng - bam Back (nut he thong) se thoat han
-        // + ngat ket noi (xem onBackPressed / exitAppAndDisconnect).
+        // truoc day). KHONG con nut thoat rieng - bam Back (nut he thong) se dong man hinh nay
+        // (quay ve trang Truyen tep, xem onBackPressed).
         textCameraOff = findViewById(R.id.text_camera_off)
         // Nho trang thai TAT camera qua lan thoat/vao lai app (ke ca khi he thong tat han app).
         cameraOff = getSharedPreferences("truyentep", MODE_PRIVATE).getBoolean("camera_off", false)
@@ -802,29 +801,15 @@ class PhotoCaptureActivity : AppCompatActivity() {
         imageReviewPhoto.alpha = 1f
     }
 
-    /** Bam Back khi dang xem lai anh -> chi dong man xem lai (khong gui), khong thoat man
-     *  hinh chup anh. Bam Back luc khac (khong con nut X rieng) -> THOAT HAN app va NGAT
-     *  KET NOI luon, KHAC voi thiet ke cu la chi dua app xuong nen giu webcam chay ngam. */
+    /** Bam Back khi dang xem lai anh -> chi dong man xem lai (khong gui). Bam Back luc khac ->
+     *  dong man hinh nay va QUAY VE trang Truyen tep cua app (khong thoat app). */
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (layoutPhotoReview.visibility == View.VISIBLE) {
             closePhotoReview()
         } else {
-            exitAppAndDisconnect()
+            finish()
         }
-    }
-
-    /** Thoat han ung dung + ngat ket noi webcam: goi THANG (dong bo, cung tien trinh)
-     *  TruyenTepHub.instance?.stopSharingNow() thay vi gui Intent bat dong bo qua
-     *  startService() nhu truoc - dam bao dong PeerConnection + bao Firebase "ended" CHAC
-     *  CHAN hoan tat xong TRUOC KHI finishAffinity(), tranh truong hop he thong dong/kill
-     *  app truoc khi Intent kip duoc xu ly (co the la nguyen nhan gay "thoat roi ma van
-     *  con ket noi"). Neu service da chet san (instance null) thi van gui them Intent
-     *  ACTION_STOP_SHARING de phong khi Android tu khoi dong lai service o dang "mo cu" -
-     *  double-safety, khong hai gi vi cleanupSession() chan chay trung. */
-    private fun exitAppAndDisconnect() {
-        TruyenTepHub.stopNow()
-        finishAffinity()
     }
 
     /**
