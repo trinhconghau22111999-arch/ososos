@@ -123,8 +123,6 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
     private var sideToggle: TextView? = null
     private var sidePanel: View? = null
     private var sideCatcher: View? = null
-    private lateinit var qrOverlay: FrameLayout
-    private var qrWeb: WebView? = null
     private lateinit var camOverlay: FrameLayout
     private var camWeb: WebView? = null
     private lateinit var splitRoot: LinearLayout
@@ -254,7 +252,6 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
         ui.removeCallbacks(sweep)
         val all = ArrayList<WebView>()
         for (t in tabs) if (!t.discarded) all.add(t.webView)
-        qrWeb?.let { all.add(it) }
         camWeb?.let { all.add(it) }
         for (t in splitTabs.values) all.add(t.webView)
         for (wv in all) silence(wv)
@@ -272,7 +269,6 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
             customView != null -> hideCustomView()
             dlScrim.visibility == View.VISIBLE -> closeDownloads()
             drawerScrim.visibility == View.VISIBLE -> closeDrawer()
-            qrOverlay.visibility == View.VISIBLE -> qrOverlay.visibility = View.GONE
             camOverlay.visibility == View.VISIBLE -> {
                 // Trang Truyen tep tu dong trinh sua anh truoc; neu khong co gi de dong thi dong ca overlay.
                 val w = camWeb
@@ -476,12 +472,6 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
         sidePanel = sideScroll; sideCatcher = catcher
         col.addView(bodyFrame, LinearLayout.LayoutParams(MATCH, 0, 1f))
 
-        qrOverlay = FrameLayout(this).apply {
-            setBackgroundColor(0xFF1A1030.toInt())
-            visibility = View.GONE
-        }
-        content.addView(qrOverlay, FrameLayout.LayoutParams(MATCH, MATCH))
-
         camOverlay = FrameLayout(this).apply {
             setBackgroundColor(0xFF1A1030.toInt())
             visibility = View.GONE
@@ -596,11 +586,6 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
         if (orig != null) {
             go(t.webView, orig)
             Toast.makeText(this, "Về ngôn ngữ gốc", Toast.LENGTH_SHORT).show()
-            return
-        }
-        val host = Uri.parse(u).host
-        if (host != null && isPhishingHost(host)) {
-            Toast.makeText(this, "Trang này nằm trong danh sách chặn", Toast.LENGTH_SHORT).show()
             return
         }
         val tr = toTranslateUrl(u)
@@ -867,15 +852,6 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val u = request?.url ?: return false
                 val scheme = u.scheme ?: return false
-                if (scheme == "webandr-back") {
-                    view?.let { go(it, HOME) }
-                    return true
-                }
-                if (scheme == "webandr-allow") {
-                    u.getQueryParameter("h")?.let { phishingAllow.add(it.lowercase()) }
-                    u.getQueryParameter("u")?.let { target -> view?.let { go(it, target) } }
-                    return true
-                }
                 // Nho zoom theo trang: ap muc zoom da luu cua trang dich truoc khi no tai.
                 if ((scheme == "http" || scheme == "https") && view != null) {
                     applyInitialScale(view, u.toString())
@@ -911,9 +887,6 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
             override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
                 val req = request ?: return null
                 val host = req.url?.host ?: return null
-                if (req.isForMainFrame && isPhishingHost(host) && !phishingAllow.contains(host.lowercase())) {
-                    return phishingResponse(host, req.url.toString())
-                }
                 if (isAdHost(host)) {
                     return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
                 }
@@ -1270,9 +1243,7 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
         m.add(0, 4, 0, "Lịch sử")
         // Mục "Xoá lịch sử" (id 7) và "Dấu trang" (id 3) đã ẩn khỏi menu: xoá lịch sử có nút "Xoá hết" trong trang Lịch sử,
         // dấu trang mở từ nút ★ trên thanh tab; clearData() và showList("Dấu trang") vẫn giữ nguyên.
-        m.add(0, 5, 0, "QR Remote Input")
         m.add(0, 9, 0, "Truyền tệp")
-        m.add(0, 11, 0, "Chặn web đen / lừa đảo")
         m.add(0, 13, 0, "Chặn quảng cáo YouTube (tự bấm Bỏ qua)").apply {
             isCheckable = true
             isChecked = adSkipOn
@@ -1286,11 +1257,9 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
             when (item.itemId) {
                 3 -> showList("Dấu trang", "bookmarks", false)
                 4 -> showList("Lịch sử", "history", true)
-                5 -> toggleQr()
                 6 -> toggleIncognito()
                 7 -> clearData()
                 9 -> toggleCam()
-                11 -> showPhishingManager()
                 13 -> toggleAdSkip()
                 14 -> toggleOneTap()
                 15 -> resetZoom()
@@ -1797,78 +1766,6 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
         b.show()
     }
 
-    // ====================== QR Remote Input ======================
-
-    private fun toggleQr() {
-        if (qrOverlay.visibility == View.VISIBLE) {
-            qrOverlay.visibility = View.GONE
-            return
-        }
-        ensureQrWeb()
-        camOverlay.visibility = View.GONE
-        qrOverlay.visibility = View.VISIBLE
-    }
-
-    @SuppressLint("SetJavaScriptEnabled", "AddJavascriptInterface")
-    private fun ensureQrWeb() {
-        if (qrWeb != null) return
-        val w = WebView(this)
-        w.settings.javaScriptEnabled = true
-        w.settings.domStorageEnabled = true
-        w.webViewClient = assetClient()
-        w.addJavascriptInterface(QrBridge(), "Android")
-        w.loadUrl("https://appassets.androidplatform.net/assets/qrremote.html")
-        qrWeb = w
-        qrOverlay.addView(w, FrameLayout.LayoutParams(MATCH, MATCH))
-    }
-
-    private inner class QrBridge {
-        @JavascriptInterface
-        fun onText(text: String) {
-            runOnUiThread { injectText(text) }
-        }
-
-        @JavascriptInterface
-        fun close() {
-            runOnUiThread { qrOverlay.visibility = View.GONE }
-        }
-
-        @JavascriptInterface
-        fun copy(text: String) {
-            runOnUiThread {
-                val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                cm.setPrimaryClip(ClipData.newPlainText("link", text))
-            }
-        }
-    }
-
-    // Giong desktop: chi giu chu/so/gach duoi/khoang trang.
-    private fun sanitizeText(text: String): String =
-        text.replace(Regex("[^\\p{L}\\p{N}_\\s]"), "")
-
-    private fun buildInjectionScript(text: String): String {
-        val quoted = JSONObject.quote(text)
-        return "(function(t){var el=document.activeElement;if(!el)return false;" +
-                "try{if(el.tagName==='INPUT'||el.tagName==='TEXTAREA'){" +
-                "var s=el.selectionStart!=null?el.selectionStart:el.value.length;" +
-                "var e=el.selectionEnd!=null?el.selectionEnd:el.value.length;" +
-                "el.setRangeText(t,s,e,'end');" +
-                "el.dispatchEvent(new Event('input',{bubbles:true}));" +
-                "el.dispatchEvent(new Event('change',{bubbles:true}));return true;}" +
-                "if(el.isContentEditable){document.execCommand('insertText',false,t);return true;}}" +
-                "catch(x){}return false;})(" + quoted + ");"
-    }
-
-    private fun injectText(raw: String) {
-        val clean = sanitizeText(raw)
-        if (clean.isEmpty()) return
-        val wv = typingWebView() ?: return
-        wv.evaluateJavascript(buildInjectionScript(clean)) {
-            // Giong desktop: tu dong nhan Enter sau khi chen.
-            sendEnter(wv)
-        }
-    }
-
     private fun sendEnter(wv: WebView) {
         wv.requestFocus()
         wv.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
@@ -1914,7 +1811,6 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
         }
         prefs.edit().putBoolean("camUsed", true).apply()
         ensureCamWeb()
-        qrOverlay.visibility = View.GONE
         camOverlay.visibility = View.VISIBLE
     }
 
@@ -2087,7 +1983,6 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
         @JavascriptInterface
         fun showOverlay() {
             runOnUiThread {
-                qrOverlay.visibility = View.GONE
                 camOverlay.visibility = View.VISIBLE
             }
         }
@@ -2545,100 +2440,6 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
         if (t.url.startsWith("http")) applyInitialScale(wv, t.url)
         val restored = try { st != null && wv.restoreState(st) != null } catch (e: Exception) { false }
         if (!restored && t.url.startsWith("http")) go(wv, t.url)
-    }
-
-    // ====================== Chan web den / lua dao ======================
-
-    private val phishingAllow = mutableSetOf<String>()
-    private var phishingCache: List<String>? = null
-
-    private fun phishingList(): List<String> {
-        phishingCache?.let { return it }
-        val out = mutableListOf<String>()
-        try {
-            val a = JSONArray(prefs.getString("phishing", "[]"))
-            for (i in 0 until a.length()) out.add(a.getString(i))
-        } catch (e: Exception) {
-            // du lieu hong - coi nhu rong
-        }
-        phishingCache = out
-        return out
-    }
-
-    private fun savePhishing(list: List<String>) {
-        val a = JSONArray()
-        for (d in list) a.put(d)
-        prefs.edit().putString("phishing", a.toString()).apply()
-        phishingCache = list.toList()
-    }
-
-    private fun isPhishingHost(host: String): Boolean {
-        val h = host.lowercase()
-        return phishingList().any { h == it || h.endsWith(".$it") }
-    }
-
-    private fun phishingResponse(host: String, url: String): WebResourceResponse {
-        val h = TextUtils.htmlEncode(host)
-        val allow = TextUtils.htmlEncode("webandr-allow://go?h=" + Uri.encode(host) + "&u=" + Uri.encode(url))
-        val html = "<!DOCTYPE html><html><head><meta charset=\"utf-8\">" +
-                "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Cảnh báo</title></head>" +
-                "<body style=\"font-family:sans-serif;background:#3a0f0f;color:#fff;padding:24px;text-align:center\">" +
-                "<div style=\"font-size:56px\">⚠️</div><h2>Cảnh báo web đen / lừa đảo</h2>" +
-                "<p>\"" + h + "\" nằm trong danh sách chặn của bạn. Tiếp tục truy cập có thể khiến bạn lộ " +
-                "thông tin cá nhân, tài khoản ngân hàng hoặc bị lừa đảo.</p>" +
-                "<p><a href=\"webandr-back://x\" style=\"display:inline-block;padding:12px 24px;background:#fff;" +
-                "color:#3a0f0f;border-radius:24px;text-decoration:none;font-weight:bold\">Quay lại an toàn</a></p>" +
-                "<p><a href=\"" + allow + "\" style=\"color:#ffb3b3;font-size:13px\">Tôi hiểu rủi ro, vẫn tiếp tục</a></p>" +
-                "</body></html>"
-        return WebResourceResponse("text/html", "utf-8", ByteArrayInputStream(html.toByteArray(Charsets.UTF_8)))
-    }
-
-    private fun showPhishingManager() {
-        val list = phishingList()
-        val b = AlertDialog.Builder(this).setTitle("Chặn web đen (" + list.size + ")")
-        if (list.isNotEmpty()) {
-            b.setItems(list.toTypedArray()) { _, i -> confirmDeletePhishing(list[i]) }
-        } else {
-            b.setMessage("Danh sách đang trống. Thêm tên miền (vd: example.com) — truy cập tên miền đó và các tên miền con sẽ bị cảnh báo.")
-        }
-        b.setPositiveButton("Thêm") { _, _ -> promptAddPhishing() }
-            .setNegativeButton("Đóng", null)
-            .show()
-    }
-
-    private fun promptAddPhishing() {
-        val input = EditText(this).apply {
-            hint = "example.com"
-            setSingleLine(true)
-        }
-        AlertDialog.Builder(this)
-            .setTitle("Thêm web vào danh sách chặn")
-            .setView(input)
-            .setPositiveButton("Thêm") { _, _ ->
-                val d = input.text.toString().trim().lowercase()
-                    .removePrefix("http://").removePrefix("https://")
-                    .substringBefore("/").removePrefix("www.")
-                if (d.isNotEmpty()) {
-                    val list = phishingList().toMutableList()
-                    if (!list.contains(d)) list.add(d)
-                    savePhishing(list)
-                    Toast.makeText(this, "Đã thêm: $d", Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setNegativeButton("Huỷ", null)
-            .show()
-    }
-
-    private fun confirmDeletePhishing(domain: String) {
-        AlertDialog.Builder(this)
-            .setTitle("Xoá khỏi danh sách chặn?")
-            .setMessage(domain)
-            .setPositiveButton("Xoá") { _, _ ->
-                savePhishing(phishingList().filter { it != domain })
-                phishingAllow.remove(domain)
-            }
-            .setNegativeButton("Giữ lại", null)
-            .show()
     }
 
     // ====================== Mat khau da luu ======================
