@@ -91,6 +91,7 @@ public class MainActivity extends Activity {
     private int cols = 4;
     private float cumScale = 1f;
     private boolean pinching, pinchJustStarted;
+    private boolean scaleStepDone;   // mỗi cử chỉ chụm/mở chỉ đổi số cột 1 bậc
     private String signature = "";
 
     private int dp(int v) {
@@ -112,6 +113,7 @@ public class MainActivity extends Activity {
             @Override
             public boolean onScaleBegin(ScaleGestureDetector d) {
                 cumScale = 1f;
+                scaleStepDone = false;
                 pinching = true;
                 pinchJustStarted = true;
                 return true;
@@ -119,9 +121,10 @@ public class MainActivity extends Activity {
 
             @Override
             public boolean onScale(ScaleGestureDetector d) {
+                if (scaleStepDone) return true;   // đã đổi 1 bậc trong cử chỉ này, chờ cử chỉ mới
                 cumScale *= d.getScaleFactor();
-                if (cumScale > 1.25f && cols > 1) { setCols(cols - 1); cumScale = 1f; }       // phóng to: ít cột, icon to hơn
-                else if (cumScale < 0.8f && cols < 4) { setCols(cols + 1); cumScale = 1f; }   // thu nhỏ: nhiều cột hơn
+                if (cumScale > 1.25f && cols > 1) { setCols(cols - 1); scaleStepDone = true; }       // phóng to: ít cột, icon to hơn
+                else if (cumScale < 0.8f && cols < 4) { setCols(cols + 1); scaleStepDone = true; }   // thu nhỏ: nhiều cột hơn
                 return true;
             }
         });
