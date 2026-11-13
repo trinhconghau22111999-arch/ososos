@@ -73,6 +73,11 @@ public class MainActivity extends Activity {
         ccPanel = findViewById(R.id.ccPanel);
         ccHeader = findViewById(R.id.ccHeader);
         ccFooter = findViewById(R.id.ccFooter);
+        findViewById(R.id.clockPanel).setBackground(Ui.panel(this, Ui.GRID));
+        findViewById(R.id.ctlBtn).setBackground(Ui.panel(this, Ui.ACCENT));
+        findViewById(R.id.searchBar).setBackground(Ui.panel(this, Ui.PLAIN));
+        search.setBackground(Ui.panel(this, Ui.ACCENT));
+        battery.setBackground(Ui.panel(this, Ui.HOT, 8));
 
         findViewById(R.id.searchBar).setOnClickListener(v -> openDrawer());
         buildFavorites();
@@ -112,7 +117,7 @@ public class MainActivity extends Activity {
         if (bat != null) {
             int level = bat.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
             int scale = bat.getIntExtra(BatteryManager.EXTRA_SCALE, 100);
-            if (level >= 0) battery.setText("Pin " + (level * 100 / scale) + "%");
+            if (level >= 0) battery.setText("● PIN " + (level * 100 / scale) + "%");
         }
         cc.refresh();
     }
@@ -190,12 +195,14 @@ public class MainActivity extends Activity {
         v.setOrientation(LinearLayout.VERTICAL);
         v.setGravity(Gravity.CENTER);
         v.setPadding(dp(2), dp(10), dp(2), dp(8));
-        v.setBackgroundResource(accent ? R.drawable.bg_accent : R.drawable.bg_panel);
+        v.setBackground(Ui.panel(this, accent ? Ui.ACCENT : Ui.PLAIN));
         ImageView iv = new ImageView(this);
         iv.setImageDrawable(ri.loadIcon(pm));
         v.addView(iv, new LinearLayout.LayoutParams(dp(38), dp(38)));
         TextView t = new TextView(this);
-        t.setText(ri.loadLabel(pm));
+        t.setText(Ui.up(ri.loadLabel(pm)));
+        Ui.style(t);
+        t.setTextSize(10);
         t.setTextColor(Color.WHITE);
         t.setTextSize(11);
         t.setMaxLines(1);
@@ -246,12 +253,13 @@ public class MainActivity extends Activity {
             dock.addView(t, lp);
         }
         TextView all = new TextView(this);
-        all.setText("⋮⋮⋮\nTất cả");
+        all.setText("⋮⋮⋮\nTẤT CẢ");
+        Ui.style(all);
         all.setGravity(Gravity.CENTER);
-        all.setTextColor(0xFF00E5FF);
+        all.setTextColor(Ui.INK);
         all.setTextSize(12);
         all.setTypeface(null, android.graphics.Typeface.BOLD);
-        all.setBackgroundResource(R.drawable.bg_accent);
+        all.setBackground(Ui.panel(this, Ui.HERO));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
         lp.setMargins(dp(3), 0, dp(3), 0);
         all.setOnClickListener(v -> openDrawer());

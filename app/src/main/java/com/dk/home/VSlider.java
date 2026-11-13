@@ -2,37 +2,43 @@ package com.dk.home;
 
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.RectF;
+import android.graphics.Shader;
 import android.view.MotionEvent;
 import android.view.View;
 
-/** Thanh trượt dọc kiểu Trung tâm điều khiển. */
+/** Thanh trượt dọc vát góc, tô gradient neon. */
 public class VSlider extends View {
     public interface Listener { void onChange(int value, boolean fromUser); }
 
     private int max;
     private int value;
     private final String glyph;
+    private final int c1, c2;
     private final Paint bg = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final RectF rect = new RectF();
-    private final Path clip = new Path();
+    private final Path path = new Path();
     private Listener listener;
 
-    public VSlider(Context c, String glyph, int color, int max) {
+    public VSlider(Context c, String glyph, int c1, int c2, int max) {
         super(c);
         this.glyph = glyph;
+        this.c1 = c1;
+        this.c2 = c2;
         this.max = Math.max(1, max);
         float d = c.getResources().getDisplayMetrics().density;
-        bg.setColor(0xFF121A33);
-        fill.setColor(color);
+        bg.setColor(0xFF0C1430);
         stroke.setStyle(Paint.Style.STROKE);
-        stroke.setStrokeWidth(1.5f * d);
-        stroke.setColor(0xFF2C3A78);
+        stroke.setStrokeWidth(1.6f * d);
+        stroke.setColor(c1);
+        glow.setStyle(Paint.Style.STROKE);
+        glow.setStrokeWidth(5f * d);
+        glow.setColor((c1 & 0x00FFFFFF) | 0x33000000);
         text.setTextSize(26 * d);
         text.setTextAlign(Paint.Align.CENTER);
     }
@@ -47,20 +53,31 @@ public class VSlider extends View {
     }
 
     @Override
+    protected void onSizeChanged(int w, int h, int ow, int oh) {
+        float s = stroke.getStrokeWidth() * 1.6f, cut = w * 0.3f;
+        path.reset();
+        path.moveTo(s + cut, s);
+        path.lineTo(w - s, s);
+        path.lineTo(w - s, h - s - cut);
+        path.lineTo(w - s - cut, h - s);
+        path.lineTo(s, h - s);
+        path.lineTo(s, s + cut);
+        path.close();
+        fill.setShader(new LinearGradient(0, h, 0, 0, c1, c2, Shader.TileMode.CLAMP));
+    }
+
+    @Override
     protected void onDraw(Canvas canvas) {
-        float w = getWidth(), h = getHeight(), r = w / 2.2f, s = stroke.getStrokeWidth() / 2;
-        rect.set(s, s, w - s, h - s);
-        canvas.drawRoundRect(rect, r, r, bg);
-        clip.reset();
-        clip.addRoundRect(rect, r, r, Path.Direction.CW);
+        float w = getWidth(), h = getHeight();
+        canvas.drawPath(path, glow);
+        canvas.drawPath(path, bg);
         canvas.save();
-        canvas.clipPath(clip);
-        float top = h * (1f - (float) value / max);
-        canvas.drawRect(0, top, w, h, fill);
+        canvas.clipPath(path);
+        canvas.drawRect(0, h * (1f - (float) value / max), w, h, fill);
         canvas.restore();
-        canvas.drawRoundRect(rect, r, r, stroke);
+        canvas.drawPath(path, stroke);
         text.setColor((float) value / max > 0.15f ? 0xFF0D1224 : 0xFFFFFFFF);
-        canvas.drawText(glyph, w / 2, h - w * 0.35f, text);
+        canvas.drawText(glyph, w / 2, h - w * 0.4f, text);
     }
 
     @Override

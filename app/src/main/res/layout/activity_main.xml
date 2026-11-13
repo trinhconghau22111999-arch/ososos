@@ -21,70 +21,118 @@
                 android:orientation="vertical"
                 android:padding="18dp">
 
-                <TextView
-                    android:id="@+id/ctlBtn"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/bg_accent"
-                    android:paddingBottom="6dp"
-                    android:paddingLeft="14dp"
-                    android:paddingRight="14dp"
-                    android:paddingTop="6dp"
-                    android:text="Trung tâm điều khiển  ⌄"
-                    android:textColor="#00E5FF"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-
-                <TextClock
-                    android:id="@+id/clock"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:format12Hour="HH:mm"
-                    android:format24Hour="HH:mm"
-                    android:textColor="#FFFFFF"
-                    android:textSize="60sp"
-                    android:textStyle="bold" />
-
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
                     android:orientation="horizontal">
 
-                    <TextClock
-                        android:id="@+id/date"
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-condensed"
+                        android:letterSpacing="0.18"
+                        android:text="DK"
+                        android:textColor="#00E5FF"
+                        android:textSize="30sp"
+                        android:textStyle="bold" />
+
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
+                        android:layout_marginLeft="8dp"
                         android:layout_weight="1"
-                        android:format12Hour="EEEE, d MMMM"
-                        android:format24Hour="EEEE, d MMMM"
-                        android:textColor="#7F8BC0"
-                        android:textSize="15sp" />
+                        android:fontFamily="sans-serif-condensed"
+                        android:letterSpacing="0.35"
+                        android:text="LAUNCHER"
+                        android:textColor="#FF2D8A"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/battery"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-condensed"
+                        android:letterSpacing="0.1"
+                        android:paddingBottom="6dp"
+                        android:paddingLeft="12dp"
+                        android:paddingRight="12dp"
+                        android:paddingTop="6dp"
                         android:textColor="#FFAB00"
-                        android:textSize="15sp"
+                        android:textSize="13sp"
                         android:textStyle="bold" />
                 </LinearLayout>
 
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="2dp"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="10dp"
                     android:background="@drawable/bg_rule" />
+
+                <LinearLayout
+                    android:id="@+id/clockPanel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:orientation="vertical"
+                    android:paddingBottom="16dp"
+                    android:paddingLeft="22dp"
+                    android:paddingRight="22dp"
+                    android:paddingTop="16dp">
+
+                    <TextClock
+                        android:id="@+id/clock"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-condensed"
+                        android:format12Hour="HH:mm"
+                        android:format24Hour="HH:mm"
+                        android:letterSpacing="0.08"
+                        android:textColor="#FFFFFF"
+                        android:textSize="66sp"
+                        android:textStyle="bold" />
+
+                    <TextClock
+                        android:id="@+id/date"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-condensed"
+                        android:format12Hour="EEEE, d MMMM"
+                        android:format24Hour="EEEE, d MMMM"
+                        android:letterSpacing="0.2"
+                        android:textAllCaps="true"
+                        android:textColor="#7F8BC0"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/ctlBtn"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:fontFamily="sans-serif-condensed"
+                    android:gravity="center"
+                    android:letterSpacing="0.14"
+                    android:padding="13dp"
+                    android:text="▼  TRUNG TÂM ĐIỀU KHIỂN"
+                    android:textColor="#00E5FF"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/searchBar"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_panel"
+                    android:layout_marginTop="10dp"
+                    android:fontFamily="sans-serif-condensed"
+                    android:letterSpacing="0.12"
                     android:padding="14dp"
-                    android:text="Tìm ứng dụng"
+                    android:text="TÌM ỨNG DỤNG"
                     android:textColor="#7F8BC0"
-                    android:textSize="15sp" />
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
 
                 <GridLayout
                     android:id="@+id/favGrid"
@@ -92,8 +140,6 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:columnCount="4" />
-
-                
             </LinearLayout>
         </ScrollView>
 
@@ -121,9 +167,10 @@
             android:id="@+id/search"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_panel"
-            android:hint="Tìm ứng dụng"
+            android:fontFamily="sans-serif-condensed"
+            android:hint="TÌM ỨNG DỤNG"
             android:inputType="text"
+            android:letterSpacing="0.1"
             android:maxLines="1"
             android:padding="14dp"
             android:textColor="#FFFFFF"
@@ -162,15 +209,18 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:gravity="center_vertical"
                 android:orientation="horizontal">
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Trung tâm điều khiển"
+                    android:fontFamily="sans-serif-condensed"
+                    android:letterSpacing="0.14"
+                    android:text="TRUNG TÂM ĐIỀU KHIỂN"
                     android:textColor="#00E5FF"
-                    android:textSize="18sp"
+                    android:textSize="20sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -183,19 +233,28 @@
                     android:textSize="24sp" />
             </LinearLayout>
 
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="2dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_rule" />
+
             <TextView
                 android:id="@+id/ccInfo"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textColor="#7F8BC0"
-                android:textSize="14sp" />
+                android:layout_marginTop="8dp"
+                android:fontFamily="sans-serif-condensed"
+                android:letterSpacing="0.12"
+                android:textColor="#FFAB00"
+                android:textSize="13sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
         <ScrollView
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="8dp"
             android:layout_weight="1"
             android:scrollbars="none">
 
@@ -210,10 +269,13 @@
             android:id="@+id/ccFooter"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-condensed"
             android:gravity="center"
+            android:letterSpacing="0.14"
             android:padding="14dp"
-            android:text="⌃  Vuốt lên hoặc chạm để đóng"
+            android:text="⌃  VUỐT LÊN HOẶC CHẠM ĐỂ ĐÓNG"
             android:textColor="#7F8BC0"
-            android:textSize="13sp" />
+            android:textSize="12sp"
+            android:textStyle="bold" />
     </LinearLayout>
 </FrameLayout>

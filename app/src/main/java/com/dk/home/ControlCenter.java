@@ -100,19 +100,21 @@ final class ControlCenter {
     private Tile tile(String glyph, String title, String sub, boolean pill) {
         Tile t = new Tile();
         t.root = new LinearLayout(a);
-        t.root.setBackgroundResource(R.drawable.bg_panel);
+        t.root.setBackground(Ui.panel(a, Ui.PLAIN));
         t.glyph = new TextView(a);
         t.glyph.setText(glyph);
         t.glyph.setTextColor(WHITE);
         t.title = new TextView(a);
-        t.title.setText(title);
+        t.title.setText(Ui.up(title));
         t.title.setTextColor(WHITE);
         t.title.setMaxLines(1);
         t.sub = new TextView(a);
-        t.sub.setText(sub);
+        t.sub.setText(Ui.up(sub));
         t.sub.setTextColor(DIM);
         t.sub.setTextSize(12);
         t.sub.setMaxLines(1);
+        Ui.style(t.title);
+        Ui.style(t.sub);
         if (pill) {
             t.root.setOrientation(LinearLayout.HORIZONTAL);
             t.root.setGravity(Gravity.CENTER_VERTICAL);
@@ -141,7 +143,7 @@ final class ControlCenter {
     }
 
     private void setActive(Tile t, boolean on) {
-        t.root.setBackgroundResource(on ? R.drawable.bg_accent : R.drawable.bg_panel);
+        t.root.setBackground(Ui.panel(a, on ? Ui.ACCENT : Ui.PLAIN));
         t.glyph.setTextColor(on ? CYAN : WHITE);
     }
 
@@ -182,25 +184,26 @@ final class ControlCenter {
         Tile w = tile("📶", "Wi-Fi", "", true);
         bind(w, () -> wifi.isWifiEnabled(), () -> go(new Intent(
                 Build.VERSION.SDK_INT >= 29 ? Settings.Panel.ACTION_INTERNET_CONNECTIVITY : Settings.ACTION_WIFI_SETTINGS)));
-        refreshers.add(() -> w.sub.setText(wifi.isWifiEnabled() ? "Đang bật" : "Đã tắt"));
+        refreshers.add(() -> w.sub.setText(Ui.up(wifi.isWifiEnabled() ? "Đang bật" : "Đã tắt")));
         place(w.root, 0, 0, 1, 2);
 
         Tile d = tile("⇅", "Dữ liệu di động", "", true);
         bind(d, this::cellular, () -> go(new Intent(Settings.ACTION_DATA_ROAMING_SETTINGS)));
         refreshers.add(() -> {
             String op = tele.getNetworkOperatorName();
-            d.title.setText(op == null || op.isEmpty() ? "Dữ liệu di động" : op);
-            d.sub.setText(cellular() ? "Đang dùng" : "Không dùng");
+            d.title.setText(Ui.up(op == null || op.isEmpty() ? "Dữ liệu di động" : op));
+            d.sub.setText(Ui.up(cellular() ? "Đang dùng" : "Không dùng"));
         });
         place(d.root, 0, 2, 1, 2);
 
         // Nhạc (2x2)
         LinearLayout media = new LinearLayout(a);
         media.setOrientation(LinearLayout.VERTICAL);
-        media.setBackgroundResource(R.drawable.bg_panel);
+        media.setBackground(Ui.panel(a, Ui.PLAIN, 16));
         media.setGravity(Gravity.CENTER);
         TextView mt = new TextView(a);
-        mt.setText("Điều khiển nhạc");
+        mt.setText("ĐIỀU KHIỂN NHẠC");
+        Ui.style(mt);
         mt.setTextColor(DIM);
         mt.setTextSize(15);
         mt.setGravity(Gravity.CENTER);
@@ -222,7 +225,7 @@ final class ControlCenter {
         place(media, 1, 0, 2, 2);
 
         // Độ sáng + âm lượng
-        bright = new VSlider(a, "☀", 0xFFFFAB00, 255);
+        bright = new VSlider(a, "☀", 0xFFFF6A00, 0xFFFFD000, 255);
         bright.setListener((v, user) -> {
             if (!user) return;
             if (!Settings.System.canWrite(a)) { askWrite(); return; }
@@ -234,7 +237,7 @@ final class ControlCenter {
         });
         place(bright, 1, 2, 2, 1);
 
-        volume = new VSlider(a, "🔊", CYAN, audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
+        volume = new VSlider(a, "🔊", 0xFF2F6BFF, CYAN, audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
         volume.setListener((v, user) -> {
             if (user) audio.setStreamVolume(AudioManager.STREAM_MUSIC, v, 0);
         });
@@ -352,11 +355,11 @@ final class ControlCenter {
         } catch (Exception ignored) { }
         Intent bat = a.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
         String op = tele.getNetworkOperatorName();
-        String s = (op == null || op.isEmpty()) ? "Không có SIM" : op;
+        String s = Ui.up((op == null || op.isEmpty()) ? "Không có SIM" : op);
         if (bat != null) {
             int level = bat.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
             int scale = bat.getIntExtra(BatteryManager.EXTRA_SCALE, 100);
-            if (level >= 0) s += "   •   Pin " + (level * 100 / scale) + "%";
+            if (level >= 0) s += "   •   PIN " + (level * 100 / scale) + "%";
         }
         info.setText(s);
     }
