@@ -1,5 +1,7 @@
 package com.dk.home;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.content.ComponentName;
@@ -24,6 +26,12 @@ import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
+import android.webkit.CookieManager;
+import android.webkit.WebChromeClient;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 import android.widget.EditText;
 import android.widget.GridLayout;
 import android.widget.ImageView;
@@ -50,9 +58,15 @@ public class MainActivity extends Activity {
     private TextView battery;
     private GridLayout grid;
     private ScrollView scroll;
-    private View ccPanel, ccHeader, ccFooter, homeRoot;
+    private View ccPanel, ccHeader, ccFooter, homeRoot, ytPanel, ytHeader;
     private ControlCenter cc;
-    private float downX, downY, startFrac, ccFrac;
+    private WebView yt;
+    private View customView;
+    private WebChromeClient.CustomViewCallback customCb;
+    private static final String YT_URL = "https://m.youtube.com/";
+    /** Vị trí trang: -1 = YouTube (bên phải) hiện, 0 = màn hình chính, 1 = trung tâm điều khiển (bên trái) hiện. */
+    private float pos, startPos, dragLo, dragHi;
+    private float downX, downY;
     private boolean tracking, dragging;
     private int touchSlop;
     private ValueAnimator anim;
@@ -75,6 +89,10 @@ public class MainActivity extends Activity {
         ccHeader = findViewById(R.id.ccHeader);
         ccFooter = findViewById(R.id.ccFooter);
         homeRoot = findViewById(R.id.homeRoot);
+        ytPanel = findViewById(R.id.ytPanel);
+        ytHeader = findViewById(R.id.ytHeader);
+        findViewById(R.id.ytClose).setOnClickListener(v -> animateTo(0f));
+        buildYoutube();
         touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
 
         findViewById(R.id.clockPanel).setBackground(Ui.panel(this, Ui.GRID));
@@ -100,6 +118,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        if (yt != null) yt.onResume();
         reloadApps();
         Intent bat = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
         if (bat != null) {
@@ -124,15 +143,31 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onPause() {
+        if (yt != null) yt.onPause();
+        super.onPause();
+    }
+
+    @Override
     protected void onDestroy() {
+        if (yt != null) {
+            ((ViewGroup) yt.getParent()).removeView(yt);
+            yt.destroy();
+        }
         cc.release();
         super.onDestroy();
     }
 
     @Override
     public void onBackPressed() {
-        if (ccFrac > 0f) closeCc();
-        else resetSearch();
+        if (customView != null) { hideCustom(); return; }
+        if (pos < 0f) {
+            if (yt.canGoBack()) yt.goBack(); else animateTo(0f);
+        } else if (pos > 0f) {
+            animateTo(0f);
+        } else {
+            resetSearch();
+        }
         // Là màn hình chính nên không thoát khi nhấn Back
     }
 
@@ -142,33 +177,95 @@ public class MainActivity extends Activity {
         return getResources().getDisplayMetrics().widthPixels;
     }
 
-    /** frac = 0: trung tâm điều khiển nằm hẳn bên trái (ẩn), 1: hiện đầy màn hình. */
-    private void setCc(float frac) {
-        ccFrac = Math.max(0f, Math.min(1f, frac));
+    /** p = 1: trung tâm điều khiển (trái) hiện hẳn; 0: màn hình chính; -1: YouTube (phải) hiện hẳn. */
+    private void setPos(float p) {
+        pos = Math.max(-1f, Math.min(1f, p));
         int w = screenW();
-        ccPanel.setTranslationX(-(1f - ccFrac) * w);
-        homeRoot.setTranslationX(ccFrac * w);
-        ccPanel.setVisibility(ccFrac > 0f ? View.VISIBLE : View.GONE);
+        homeRoot.setTranslationX(pos * w);
+        ccPanel.setTranslationX((pos - 1f) * w);
+        ytPanel.setTranslationX((pos + 1f) * w);
+        ccPanel.setVisibility(pos > 0f ? View.VISIBLE : View.GONE);
+        ytPanel.setVisibility(pos < 0f ? View.VISIBLE : View.GONE);
     }
 
-    private void animateCc(final boolean open) {
+    private void animateTo(final float target) {
         if (anim != null) anim.cancel();
-        if (open) cc.refresh();
-        anim = ValueAnimator.ofFloat(ccFrac, open ? 1f : 0f);
+        if (target > 0f) cc.refresh();
+        anim = ValueAnimator.ofFloat(pos, target);
         anim.setDuration(220);
-        anim.addUpdateListener(va -> setCc((Float) va.getAnimatedValue()));
+        anim.addUpdateListener(va -> setPos((Float) va.getAnimatedValue()));
+        anim.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                // Rời khỏi màn hình YouTube thì tạm dừng video
+                if (pos == 0f && yt != null) {
+                    yt.evaluateJavascript("document.querySelectorAll('video').forEach(function(v){v.pause();})", null);
+                }
+            }
+        });
         anim.start();
     }
 
     private void openCc() {
-        animateCc(true);
+        animateTo(1f);
     }
 
     private void closeCc() {
-        if (ccFrac > 0f) animateCc(false);
+        if (pos != 0f) animateTo(0f);
     }
 
-    /** Vuốt từ trái sang phải để kéo trung tâm điều khiển ra, vuốt ngược lại để đóng. */
+    private boolean hit(View v, float rawY) {
+        int[] l = new int[2];
+        v.getLocationOnScreen(l);
+        return rawY >= l[1] && rawY <= l[1] + v.getHeight();
+    }
+
+    // ---------- YouTube (màn hình bên phải) ----------
+
+    private void buildYoutube() {
+        FrameLayout holder = findViewById(R.id.ytHolder);
+        yt = new WebView(this);
+        WebSettings ws = yt.getSettings();
+        ws.setJavaScriptEnabled(true);
+        ws.setDomStorageEnabled(true);
+        ws.setMediaPlaybackRequiresUserGesture(false);
+        ws.setLoadWithOverviewMode(true);
+        CookieManager.getInstance().setAcceptCookie(true);
+        yt.setBackgroundColor(0xFF0D1224);
+        yt.setWebViewClient(new WebViewClient());
+        yt.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onShowCustomView(View view, CustomViewCallback cb) {
+                if (customView != null) { cb.onCustomViewHidden(); return; }
+                customView = view;
+                customCb = cb;
+                view.setBackgroundColor(Color.BLACK);
+                ((ViewGroup) findViewById(android.R.id.content)).addView(view,
+                        new FrameLayout.LayoutParams(-1, -1));
+            }
+
+            @Override
+            public void onHideCustomView() {
+                hideCustom();
+            }
+        });
+        holder.addView(yt, new FrameLayout.LayoutParams(-1, -1));
+        yt.loadUrl(YT_URL);
+    }
+
+    private void hideCustom() {
+        if (customView == null) return;
+        ((ViewGroup) customView.getParent()).removeView(customView);
+        customView = null;
+        if (customCb != null) customCb.onCustomViewHidden();
+        customCb = null;
+    }
+
+    /**
+     * Vuốt từ trái sang phải: hiện trung tâm điều khiển (bên trái).
+     * Vuốt từ phải sang trái: hiện YouTube (bên phải).
+     * Đóng YouTube: vuốt trái sang phải ở thanh tiêu đề hoặc sát mép trái, hoặc bấm "ĐÓNG".
+     */
     @Override
     public boolean dispatchTouchEvent(MotionEvent e) {
         switch (e.getActionMasked()) {
@@ -177,18 +274,25 @@ public class MainActivity extends Activity {
                 downX = e.getRawX();
                 downY = e.getRawY();
                 dragging = false;
-                startFrac = ccFrac;
-                tracking = ccFrac > 0f || !search.hasFocus();
+                if (customView != null) tracking = false;
+                else if (pos == 0f) tracking = !search.hasFocus();
+                else if (pos > 0f) tracking = true;
+                else tracking = downX < dp(36) || hit(ytHeader, downY);
                 break;
             case MotionEvent.ACTION_MOVE:
                 if (tracking && !dragging) {
                     float dx = e.getRawX() - downX, dy = e.getRawY() - downY;
                     if (Math.abs(dx) > touchSlop * 2 && Math.abs(dx) > Math.abs(dy) * 1.5f) {
-                        boolean closedRight = ccFrac <= 0f && dx > 0;
-                        boolean openLeft = ccFrac > 0f && dx < 0;
-                        if (closedRight || openLeft || (ccFrac > 0f && ccFrac < 1f)) {
+                        boolean ok;
+                        if (pos >= 1f) ok = dx < 0;
+                        else if (pos <= -1f) ok = dx > 0;
+                        else ok = true;
+                        if (ok) {
                             dragging = true;
-                            startFrac = ccFrac;
+                            startPos = pos;
+                            boolean positive = pos > 0f || (pos == 0f && dx > 0);
+                            dragLo = positive ? 0f : -1f;
+                            dragHi = positive ? 1f : 0f;
                             downX = e.getRawX();
                             MotionEvent c = MotionEvent.obtain(e);
                             c.setAction(MotionEvent.ACTION_CANCEL);
@@ -200,7 +304,8 @@ public class MainActivity extends Activity {
                     }
                 }
                 if (dragging) {
-                    setCc(startFrac + (e.getRawX() - downX) / screenW());
+                    float p = startPos + (e.getRawX() - downX) / screenW();
+                    setPos(Math.max(dragLo, Math.min(dragHi, p)));
                     return true;
                 }
                 break;
@@ -208,8 +313,10 @@ public class MainActivity extends Activity {
             case MotionEvent.ACTION_CANCEL:
                 if (dragging) {
                     dragging = false;
-                    boolean open = startFrac < 0.5f ? ccFrac > 0.3f : ccFrac > 0.7f;
-                    animateCc(open);
+                    float target;
+                    if (Math.abs(startPos) < 0.5f) target = Math.abs(pos) > 0.3f ? Math.signum(pos) : 0f;
+                    else target = Math.abs(pos) > 0.7f ? Math.signum(startPos) : 0f;
+                    animateTo(target);
                     return true;
                 }
                 break;
