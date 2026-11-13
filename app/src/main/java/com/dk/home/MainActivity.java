@@ -60,7 +60,7 @@ public class MainActivity extends Activity {
     private TextView battery;
     private GridLayout grid;
     private ScrollView scroll;
-    private View ccPanel, ccHeader, ccFooter, homeRoot, ytPanel, ytHeader;
+    private View ccPanel, ccHeader, homeRoot, ytPanel, ytHeader;
     private ControlCenter cc;
     private WebView yt;
     private View customView;
@@ -90,7 +90,6 @@ public class MainActivity extends Activity {
         scroll = findViewById(R.id.homeScroll);
         ccPanel = findViewById(R.id.ccPanel);
         ccHeader = findViewById(R.id.ccHeader);
-        ccFooter = findViewById(R.id.ccFooter);
         homeRoot = findViewById(R.id.homeRoot);
         ytPanel = findViewById(R.id.ytPanel);
         ytHeader = findViewById(R.id.ytHeader);
@@ -108,7 +107,6 @@ public class MainActivity extends Activity {
         cc = new ControlCenter(this, (GridLayout) findViewById(R.id.ccGrid),
                 (TextView) findViewById(R.id.ccInfo), this::closeCc);
         findViewById(R.id.ctlBtn).setOnClickListener(v -> openCc());
-        ccFooter.setOnClickListener(v -> closeCc());
         findViewById(R.id.ccSettings).setOnClickListener(v -> go(new Intent(Settings.ACTION_SETTINGS)));
 
         setPos(0f);
