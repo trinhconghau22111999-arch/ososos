@@ -22,6 +22,8 @@ import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.MotionEvent;
+import android.view.VelocityTracker;
+import android.view.animation.DecelerateInterpolator;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
@@ -70,6 +72,7 @@ public class MainActivity extends Activity {
     private boolean tracking, dragging;
     private int touchSlop;
     private ValueAnimator anim;
+    private VelocityTracker vt;
     private String signature = "";
 
     private int dp(int v) {
@@ -107,6 +110,8 @@ public class MainActivity extends Activity {
         findViewById(R.id.ctlBtn).setOnClickListener(v -> openCc());
         ccFooter.setOnClickListener(v -> closeCc());
         findViewById(R.id.ccSettings).setOnClickListener(v -> go(new Intent(Settings.ACTION_SETTINGS)));
+
+        setPos(0f);
 
         search.addTextChangedListener(new TextWatcher() {
             public void beforeTextChanged(CharSequence s, int a, int b2, int c) { }
@@ -184,23 +189,56 @@ public class MainActivity extends Activity {
         homeRoot.setTranslationX(pos * w);
         ccPanel.setTranslationX((pos - 1f) * w);
         ytPanel.setTranslationX((pos + 1f) * w);
-        ccPanel.setVisibility(pos > 0f ? View.VISIBLE : View.GONE);
-        ytPanel.setVisibility(pos < 0f ? View.VISIBLE : View.GONE);
+        int cv = pos > 0f ? View.VISIBLE : View.INVISIBLE;
+        int yv = pos < 0f ? View.VISIBLE : View.INVISIBLE;
+        if (ccPanel.getVisibility() != cv) ccPanel.setVisibility(cv);
+        if (ytPanel.getVisibility() != yv) ytPanel.setVisibility(yv);
+    }
+
+    /** Bật layer phần cứng khi đang vuốt/chuyển trang để trượt mượt, tắt lại khi xong. */
+    private void layers(boolean on) {
+        int t = on ? View.LAYER_TYPE_HARDWARE : View.LAYER_TYPE_NONE;
+        if (homeRoot.getLayerType() != t) homeRoot.setLayerType(t, null);
+        if (ccPanel.getLayerType() != t) ccPanel.setLayerType(t, null);
+        if (ytPanel.getLayerType() != t) ytPanel.setLayerType(t, null);
     }
 
     private void animateTo(final float target) {
+        animateTo(target, 0f);
+    }
+
+    /** vx: vận tốc ngón tay (px/giây) lúc thả, dùng để chọn thời gian trượt cho tự nhiên. */
+    private void animateTo(final float target, float vx) {
         if (anim != null) anim.cancel();
-        if (target > 0f) cc.refresh();
+        layers(true);
+        float dist = Math.abs(target - pos);
+        long dur = 120 + (long) (140 * dist);
+        if (Math.abs(vx) > 0f) {
+            float need = dist * screenW();
+            long byVel = (long) (need / Math.max(Math.abs(vx), 1f) * 1000f);
+            dur = Math.max(100, Math.min(dur, byVel));
+        }
         anim = ValueAnimator.ofFloat(pos, target);
-        anim.setDuration(220);
+        anim.setDuration(dur);
+        anim.setInterpolator(new DecelerateInterpolator(1.6f));
         anim.addUpdateListener(va -> setPos((Float) va.getAnimatedValue()));
         anim.addListener(new AnimatorListenerAdapter() {
+            private boolean cancelled;
+
+            @Override
+            public void onAnimationCancel(Animator animation) {
+                cancelled = true;
+            }
+
             @Override
             public void onAnimationEnd(Animator animation) {
-                // Rời khỏi màn hình YouTube thì tạm dừng video
+                if (cancelled) return;
+                setPos(target);
+                layers(false);
                 if (pos == 0f && yt != null) {
                     yt.evaluateJavascript("document.querySelectorAll('video').forEach(function(v){v.pause();})", null);
                 }
+                if (pos == 1f) cc.refresh();
             }
         });
         anim.start();
@@ -268,9 +306,12 @@ public class MainActivity extends Activity {
      */
     @Override
     public boolean dispatchTouchEvent(MotionEvent e) {
+        if (vt != null) vt.addMovement(e);
         switch (e.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 if (anim != null) anim.cancel();
+                if (vt != null) vt.recycle();
+                vt = VelocityTracker.obtain();
                 downX = e.getRawX();
                 downY = e.getRawY();
                 dragging = false;
@@ -293,6 +334,7 @@ public class MainActivity extends Activity {
                             boolean positive = pos > 0f || (pos == 0f && dx > 0);
                             dragLo = positive ? 0f : -1f;
                             dragHi = positive ? 1f : 0f;
+                            layers(true);
                             downX = e.getRawX();
                             MotionEvent c = MotionEvent.obtain(e);
                             c.setAction(MotionEvent.ACTION_CANCEL);
@@ -313,10 +355,22 @@ public class MainActivity extends Activity {
             case MotionEvent.ACTION_CANCEL:
                 if (dragging) {
                     dragging = false;
+                    float vx = 0f;
+                    if (vt != null) {
+                        vt.computeCurrentVelocity(1000);
+                        vx = vt.getXVelocity();
+                    }
                     float target;
-                    if (Math.abs(startPos) < 0.5f) target = Math.abs(pos) > 0.3f ? Math.signum(pos) : 0f;
-                    else target = Math.abs(pos) > 0.7f ? Math.signum(startPos) : 0f;
-                    animateTo(target);
+                    if (Math.abs(vx) > dp(500)) {
+                        // vuốt nhanh: chuyển trang theo hướng ngón tay
+                        if (Math.abs(startPos) < 0.5f) target = Math.max(dragLo, Math.min(dragHi, vx > 0 ? 1f : -1f));
+                        else target = (vx * startPos < 0) ? 0f : Math.signum(startPos);
+                    } else if (Math.abs(startPos) < 0.5f) {
+                        target = Math.abs(pos) > 0.3f ? Math.signum(pos) : 0f;
+                    } else {
+                        target = Math.abs(pos) > 0.7f ? Math.signum(startPos) : 0f;
+                    }
+                    animateTo(target, vx);
                     return true;
                 }
                 break;
