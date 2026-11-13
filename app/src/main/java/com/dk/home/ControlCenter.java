@@ -136,8 +136,11 @@ final class ControlCenter {
             t.title.setTextSize(10);
             t.title.setGravity(Gravity.CENTER);
             t.title.setPadding(dp(2), dp(2), dp(2), 0);
-            t.root.addView(t.glyph);
-            t.root.addView(t.title);
+            t.title.setMaxLines(2);
+            t.title.setLetterSpacing(0.03f);
+            t.glyph.setGravity(Gravity.CENTER);
+            t.root.addView(t.glyph, new LinearLayout.LayoutParams(-1, -2));
+            t.root.addView(t.title, new LinearLayout.LayoutParams(-1, -2));
         }
         return t;
     }

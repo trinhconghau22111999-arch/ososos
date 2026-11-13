@@ -76,7 +76,7 @@ public class VSlider extends View {
         canvas.drawRect(0, h * (1f - (float) value / max), w, h, fill);
         canvas.restore();
         canvas.drawPath(path, stroke);
-        text.setColor((float) value / max > 0.15f ? 0xFF0D1224 : 0xFFFFFFFF);
+        text.setColor(0xFFFFFFFF);
         canvas.drawText(glyph, w / 2, h - w * 0.4f, text);
     }
 
