@@ -85,6 +85,9 @@ public class MainActivity extends Activity {
     private View rcPanel;
     private RemotePage rc;
     private boolean rcActive;
+    private View brPanel;
+    private BrowserPage br;
+    private boolean brActive;
     private View customView;
     private WebChromeClient.CustomViewCallback customCb;
     private static final String YT_URL = "https://m.youtube.com/";
@@ -147,6 +150,9 @@ public class MainActivity extends Activity {
         rcPanel = findViewById(R.id.rcPanel);
         rc = new RemotePage(this);
         ((ViewGroup) rcPanel).addView(rc, new FrameLayout.LayoutParams(-1, -1));
+        brPanel = findViewById(R.id.brPanel);
+        br = new BrowserPage(this);
+        ((ViewGroup) brPanel).addView(br, new FrameLayout.LayoutParams(-1, -1));
         touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
 
         findViewById(R.id.clockPanel).setBackground(Ui.panel(this, Ui.GRID));
@@ -176,6 +182,7 @@ public class MainActivity extends Activity {
         if (yt != null) yt.onResume();
         if (tv != null) tv.onAppResume();
         if (rc != null) rc.setActive(rcActive);
+        if (br != null) br.resume();
         ensureDark();
         reloadApps();
         Intent bat = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
@@ -205,6 +212,7 @@ public class MainActivity extends Activity {
         if (yt != null) yt.onPause();
         if (tv != null) tv.onAppPause();
         if (rc != null) rc.setActive(false);
+        if (br != null) br.pause();
         super.onPause();
     }
 
@@ -216,6 +224,7 @@ public class MainActivity extends Activity {
         }
         if (tv != null) tv.destroy();
         if (rc != null) rc.destroy();
+        if (br != null) br.destroy();
         cc.release();
         super.onDestroy();
     }
@@ -245,6 +254,8 @@ public class MainActivity extends Activity {
         }
         if (pos < 0f) {
             if (yt.canGoBack()) yt.goBack(); else animateTo(0f);
+        } else if (pos > 1f) {
+            if (!br.onBack()) animateTo(1f);   // trình duyệt: lùi trang, hết lịch sử thì về trang Tiện ích
         } else if (pos > 0f) {
             animateTo(0f);
         } else {
@@ -261,13 +272,14 @@ public class MainActivity extends Activity {
 
     /** p = 1: trung tâm điều khiển (trái) hiện hẳn; 0: màn hình chính; -1: YouTube (phải) hiện hẳn. */
     private void setPos(float p) {
-        pos = Math.max(-3f, Math.min(1f, p));
+        pos = Math.max(-3f, Math.min(2f, p));
         int w = screenW();
         homeRoot.setTranslationX(pos * w);
         ccPanel.setTranslationX((pos - 1f) * w);
         ytPanel.setTranslationX((pos + 1f) * w);
         tvPanel.setTranslationX((pos + 2f) * w);
         rcPanel.setTranslationX((pos + 3f) * w);
+        brPanel.setTranslationX((pos - 2f) * w);
         int cv = pos > 0f ? View.VISIBLE : View.INVISIBLE;
         int yv = pos < 0f ? View.VISIBLE : View.INVISIBLE;
         int tvv = pos < -1f ? View.VISIBLE : View.INVISIBLE;
@@ -276,6 +288,13 @@ public class MainActivity extends Activity {
         if (ytPanel.getVisibility() != yv) ytPanel.setVisibility(yv);
         if (tvPanel.getVisibility() != tvv) tvPanel.setVisibility(tvv);
         if (rcPanel.getVisibility() != rv) rcPanel.setVisibility(rv);
+        int bv = pos > 1f ? View.VISIBLE : View.INVISIBLE;
+        if (brPanel.getVisibility() != bv) brPanel.setVisibility(bv);
+        boolean brAct = pos >= 1.98f;
+        if (br != null && brAct != brActive) {
+            brActive = brAct;
+            br.setActive(brAct);
+        }
         // Trang TV chỉ bật khi đã dừng hẳn ở trang đó (không bật giữa lúc đang vuốt, tránh khựng)
         boolean tvAct = Math.abs(pos + 2f) < 0.02f;
         if (tv != null && tvAct != tvActive) {
@@ -299,6 +318,7 @@ public class MainActivity extends Activity {
         if (ytPanel.getLayerType() != t) ytPanel.setLayerType(t, null);
         if (tvPanel.getLayerType() != t) tvPanel.setLayerType(t, null);
         if (rcPanel.getLayerType() != t) rcPanel.setLayerType(t, null);
+        if (brPanel.getLayerType() != t) brPanel.setLayerType(t, null);
     }
 
     private void animateTo(final float target) {
@@ -460,6 +480,20 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) { }
     }
 
+    /** Toàn màn hình video cho trình duyệt (và YouTube dùng chung). */
+    void showCustom(View view, WebChromeClient.CustomViewCallback cb) {
+        if (customView != null) { cb.onCustomViewHidden(); return; }
+        customView = view;
+        customCb = cb;
+        view.setBackgroundColor(Color.BLACK);
+        ((ViewGroup) findViewById(android.R.id.content)).addView(view,
+                new FrameLayout.LayoutParams(-1, -1));
+    }
+
+    void hideCustomPublic() {
+        hideCustom();
+    }
+
     private void hideCustom() {
         if (customView == null) return;
         ((ViewGroup) customView.getParent()).removeView(customView);
@@ -523,7 +557,8 @@ public class MainActivity extends Activity {
                     float dx = e.getRawX() - downX, dy = e.getRawY() - downY;
                     if (Math.abs(dx) > touchSlop * 2 && Math.abs(dx) > Math.abs(dy) * 1.5f) {
                         boolean ok;
-                        if (pos >= 1f) ok = dx < 0;
+                        if (pos >= 2f) ok = dx < 0 && br.canSwipeBack(downX, downY, screenW());   // trình duyệt
+                        else if (pos >= 1f) ok = true;           // trang Tiện ích: vuốt phải mở trình duyệt, vuốt trái về chính
                         else if (pos <= -3f) ok = dx > 0;
                         else if (pos <= -2f) ok = true;          // trang TV: vuốt được cả hai chiều
                         else if (pos <= -1f) {
@@ -535,8 +570,8 @@ public class MainActivity extends Activity {
                             dragging = true;
                             startPos = pos;
                             boolean positive = pos > 0f || (pos == 0f && dx > 0);
-                            dragLo = positive ? 0f : -3f;
-                            dragHi = positive ? 1f : 0f;
+                            dragLo = positive ? (pos > 1.5f ? 1f : 0f) : -3f;
+                            dragHi = positive ? (pos > 0.5f ? 2f : 1f) : 0f;
                             layers(true);
                             downX = e.getRawX();
                             MotionEvent c = MotionEvent.obtain(e);
@@ -573,12 +608,12 @@ public class MainActivity extends Activity {
                         float moved = pos - startPage;
                         target = Math.abs(moved) > 0.3f ? startPage + Math.signum(moved) : startPage;
                     }
-                    target = Math.max(-3f, Math.min(1f, target));
+                    target = Math.max(-3f, Math.min(2f, target));
                     animateTo(target, vx);
                     return true;
                 }
                 // Chạm giữa lúc đang trượt làm hoạt ảnh bị huỷ: không để trang kẹt lưng chừng
-                if (pos != 0f && pos != 1f && pos != -1f && pos != -2f && pos != -3f) animateTo(Math.round(pos));
+                if (pos != 0f && pos != 1f && pos != 2f && pos != -1f && pos != -2f && pos != -3f) animateTo(Math.round(pos));
                 break;
         }
         return super.dispatchTouchEvent(e);

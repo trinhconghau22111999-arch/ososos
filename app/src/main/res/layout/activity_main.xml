@@ -257,4 +257,12 @@
         android:background="#0A0C12"
         android:clickable="true"
         android:visibility="gone" />
+
+    <FrameLayout
+        android:id="@+id/brPanel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#0B1020"
+        android:clickable="true"
+        android:visibility="gone" />
 </FrameLayout>
