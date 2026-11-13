@@ -791,7 +791,7 @@ final class BrowserPage extends LinearLayout {
                 cv.drawLine(cx + 3f * d, cy + 3f * d, cx + 9f * d, cy + 9f * d, p);
             } else {
                 path.reset();
-                float R = 11f * d, r = 4.6f * d;
+                float R = 11f * d, r = 4.3f * d;   // tỉ lệ ~0.38: ngôi sao 5 cánh chuẩn, không bị mập
                 for (int i = 0; i < 10; i++) {
                     double a = -Math.PI / 2 + i * Math.PI / 5;
                     float rr = i % 2 == 0 ? R : r;
@@ -800,7 +800,7 @@ final class BrowserPage extends LinearLayout {
                 }
                 path.close();
                 p.setStrokeJoin(Paint.Join.ROUND);
-                p.setStyle(type == STAR_FILLED ? Paint.Style.FILL_AND_STROKE : Paint.Style.STROKE);
+                p.setStyle(type == STAR_FILLED ? Paint.Style.FILL : Paint.Style.STROKE);   // sao đặc chỉ tô màu, không viền (viền làm sao bị dày/nhòe)
                 cv.drawPath(path, p);
             }
         }
