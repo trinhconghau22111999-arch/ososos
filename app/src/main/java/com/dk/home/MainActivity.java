@@ -27,6 +27,7 @@ import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.VelocityTracker;
 import android.view.animation.DecelerateInterpolator;
 import android.view.View;
@@ -81,6 +82,10 @@ public class MainActivity extends Activity {
     private int touchSlop;
     private ValueAnimator anim;
     private VelocityTracker vt;
+    private ScaleGestureDetector scale;
+    private int cols = 4;
+    private float cumScale = 1f;
+    private boolean pinching, pinchJustStarted;
     private String signature = "";
 
     private int dp(int v) {
@@ -96,6 +101,25 @@ public class MainActivity extends Activity {
         battery = findViewById(R.id.battery);
         grid = findViewById(R.id.appsGrid);
         scroll = findViewById(R.id.homeScroll);
+        cols = Math.max(1, Math.min(4, getSharedPreferences(PREFS, MODE_PRIVATE).getInt("cols", 4)));
+        grid.setColumnCount(cols);
+        scale = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            @Override
+            public boolean onScaleBegin(ScaleGestureDetector d) {
+                cumScale = 1f;
+                pinching = true;
+                pinchJustStarted = true;
+                return true;
+            }
+
+            @Override
+            public boolean onScale(ScaleGestureDetector d) {
+                cumScale *= d.getScaleFactor();
+                if (cumScale > 1.25f && cols > 1) { setCols(cols - 1); cumScale = 1f; }       // phóng to: ít cột, icon to hơn
+                else if (cumScale < 0.8f && cols < 4) { setCols(cols + 1); cumScale = 1f; }   // thu nhỏ: nhiều cột hơn
+                return true;
+            }
+        });
         ccPanel = findViewById(R.id.ccPanel);
         ccHeader = findViewById(R.id.ccHeader);
         homeRoot = findViewById(R.id.homeRoot);
@@ -343,7 +367,28 @@ public class MainActivity extends Activity {
     @Override
     public boolean dispatchTouchEvent(MotionEvent e) {
         if (vt != null) vt.addMovement(e);
+        // Chụm / nở hai ngón tay trên màn hình chính để đổi số ứng dụng mỗi hàng
+        if (pos == 0f && !dragging && customView == null) {
+            if (e.getActionMasked() == MotionEvent.ACTION_DOWN) pinching = false;
+            scale.onTouchEvent(e);
+            if (pinching) {
+                int act = e.getActionMasked();
+                if (pinchJustStarted) {
+                    pinchJustStarted = false;
+                    MotionEvent c = MotionEvent.obtain(e);
+                    c.setAction(MotionEvent.ACTION_CANCEL);
+                    super.dispatchTouchEvent(c);
+                    c.recycle();
+                }
+                if (act == MotionEvent.ACTION_UP || act == MotionEvent.ACTION_CANCEL) pinching = false;
+                tracking = false;
+                return true;
+            }
+        }
         switch (e.getActionMasked()) {
+            case MotionEvent.ACTION_POINTER_DOWN:
+                if (!dragging) tracking = false;
+                break;
             case MotionEvent.ACTION_DOWN:
                 if (anim != null) anim.cancel();
                 if (vt != null) vt.recycle();
@@ -433,6 +478,10 @@ public class MainActivity extends Activity {
     }
 
     private LinearLayout makeTile(CharSequence label, Drawable icon, int iconDp, int style) {
+        return makeTile(label, icon, iconDp, style, 10);
+    }
+
+    private LinearLayout makeTile(CharSequence label, Drawable icon, int iconDp, int style, int textSp) {
         LinearLayout v = new LinearLayout(this);
         v.setOrientation(LinearLayout.VERTICAL);
         v.setGravity(Gravity.CENTER);
@@ -445,7 +494,7 @@ public class MainActivity extends Activity {
         t.setText(Ui.up(label));
         t.setTextColor(Color.WHITE);
         Ui.style(t);
-        t.setTextSize(10);
+        t.setTextSize(textSp);
         t.setMaxLines(1);
         t.setEllipsize(TextUtils.TruncateAt.END);
         t.setGravity(Gravity.CENTER);
@@ -598,6 +647,25 @@ public class MainActivity extends Activity {
         d.show();
     }
 
+    private int iconDpFor(int c) {
+        return c >= 4 ? 38 : c == 3 ? 50 : c == 2 ? 66 : 84;
+    }
+
+    private int textSpFor(int c) {
+        return c >= 4 ? 10 : c == 3 ? 12 : c == 2 ? 14 : 16;
+    }
+
+    /** Đổi số ứng dụng trên một hàng (1 đến 4) và lưu lại. */
+    private void setCols(int n) {
+        n = Math.max(1, Math.min(4, n));
+        if (n == cols) return;
+        cols = n;
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putInt("cols", cols).apply();
+        grid.setColumnCount(cols);
+        signature = "";
+        reloadApps();
+    }
+
     /** Đưa toàn bộ ứng dụng lên màn hình chính. */
     private void reloadApps() {
         Intent main = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
@@ -623,7 +691,7 @@ public class MainActivity extends Activity {
         });
         grid.removeAllViews();
         for (final Entry e : apps) {
-            LinearLayout t = makeTile(e.label, e.icon, 38, Ui.PLAIN);
+            LinearLayout t = makeTile(e.label, e.icon, iconDpFor(cols), Ui.PLAIN, textSpFor(cols));
             t.setOnClickListener(x -> go(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(e.cn)));
             t.setOnLongClickListener(x -> {
                 go(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
