@@ -1261,12 +1261,11 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
     }
 
     private fun showMenu(anchor: View) {
-        val tab = active
         val popup = PopupMenu(this, anchor)
         val m = popup.menu
-        m.add(0, 6, 0, "Chế độ máy tính").apply {
+        m.add(0, 6, 0, "Chế độ ẩn danh").apply {
             isCheckable = true
-            isChecked = tab?.desktop == true
+            isChecked = incognitoOn
         }
         m.add(0, 4, 0, "Lịch sử")
         // Mục "Xoá lịch sử" (id 7) và "Dấu trang" (id 3) đã ẩn khỏi menu: xoá lịch sử có nút "Xoá hết" trong trang Lịch sử,
@@ -1288,7 +1287,7 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
                 3 -> showList("Dấu trang", "bookmarks", false)
                 4 -> showList("Lịch sử", "history", true)
                 5 -> toggleQr()
-                6 -> toggleDesktop()
+                6 -> toggleIncognito()
                 7 -> clearData()
                 9 -> toggleCam()
                 11 -> showPhishingManager()
@@ -1301,11 +1300,19 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
         popup.show()
     }
 
-    private fun toggleDesktop() {
-        val tab = active ?: return
-        tab.desktop = !tab.desktop
-        tab.webView.settings.userAgentString = if (tab.desktop) desktopUa else mobileUa
-        tab.webView.reload()
+    // Chế độ ẩn danh: duyệt bình thường, nhưng không ghi lịch sử trang (kể cả trang tìm kiếm Google/YouTube).
+    // Lưu trong prefs để giữ nguyên khi mở lại app; tắt đi thì việc ghi lịch sử hoạt động lại như cũ.
+    private var incognitoOn: Boolean
+        get() = prefs.getBoolean("incognito", false)
+        set(v) { prefs.edit().putBoolean("incognito", v).apply() }
+
+    private fun toggleIncognito() {
+        incognitoOn = !incognitoOn
+        Toast.makeText(
+            this,
+            if (incognitoOn) "Đã bật chế độ ẩn danh: không lưu lịch sử" else "Đã tắt chế độ ẩn danh",
+            Toast.LENGTH_SHORT
+        ).show()
     }
 
     private fun clearData() {
@@ -1337,6 +1344,7 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
     }
 
     private fun addHistory(title: String, url: String) {
+        if (incognitoOn) return   // chế độ ẩn danh: không ghi lịch sử
         val list = readList("history")
         if (list.isNotEmpty() && list[0][1] == url) return
         list.add(0, arrayOf(title, url))
