@@ -106,6 +106,11 @@ public class MainActivity extends Activity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        if (ControlCenter.keepOpen) {
+            ControlCenter.keepOpen = false;
+            cc.refresh();
+            return;
+        }
         closeCc();
         resetSearch();
         scroll.smoothScrollTo(0, 0);

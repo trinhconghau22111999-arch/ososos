@@ -1,6 +1,7 @@
 package com.dk.home;
 
 import android.accessibilityservice.AccessibilityService;
+import android.bluetooth.BluetoothAdapter;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -37,6 +38,8 @@ import java.util.List;
 final class ControlCenter {
     private static final int CYAN = 0xFF00E5FF, DIM = 0xFF7F8BC0, WHITE = 0xFFFFFFFF;
 
+    static boolean keepOpen;
+
     interface State { boolean on(); }
 
     private static class Tile {
@@ -55,6 +58,7 @@ final class ControlCenter {
     private final ConnectivityManager conn;
     private final TelephonyManager tele;
     private final LocationManager loc;
+    private final Handler ui = new Handler(Looper.getMainLooper());
     private CameraManager cam;
     private CameraManager.TorchCallback torchCb;
     private String torchId;
@@ -104,6 +108,7 @@ final class ControlCenter {
         t.glyph = new TextView(a);
         t.glyph.setText(glyph);
         t.glyph.setTextColor(WHITE);
+        t.glyph.setGravity(Gravity.CENTER_HORIZONTAL);
         t.title = new TextView(a);
         t.title.setText(Ui.up(title));
         t.title.setTextColor(WHITE);
@@ -133,7 +138,7 @@ final class ControlCenter {
             t.root.setOrientation(LinearLayout.VERTICAL);
             t.root.setGravity(Gravity.CENTER);
             t.glyph.setTextSize(24);
-            t.title.setTextSize(10);
+            t.title.setTextSize(9);
             t.title.setGravity(Gravity.CENTER);
             t.title.setPadding(dp(2), dp(2), dp(2), 0);
             t.title.setMaxLines(2);
@@ -153,6 +158,33 @@ final class ControlCenter {
     private void bind(Tile t, State s, Runnable click) {
         t.root.setOnClickListener(v -> click.run());
         if (s != null) refreshers.add(() -> setActive(t, s.on()));
+    }
+
+    private void later() {
+        ui.postDelayed(this::refresh, 900);
+        ui.postDelayed(this::refresh, 2200);
+    }
+
+    /** Bấm nút tương ứng trong bảng cài đặt nhanh của hệ thống (qua dịch vụ hỗ trợ tiếp cận). */
+    private void viaQs(String... keys) {
+        ScreenshotService svc = ScreenshotService.instance;
+        if (svc == null) {
+            Toast.makeText(a, "Bật \"DK Home\" trong Hỗ trợ tiếp cận để nút này hoạt động trực tiếp", Toast.LENGTH_LONG).show();
+            go(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+            return;
+        }
+        keepOpen = true;
+        svc.clickTile(keys, ok -> {
+            if (!ok) Toast.makeText(a, "Không tìm thấy nút này trong bảng nhanh của máy", Toast.LENGTH_LONG).show();
+            ui.postDelayed(() -> keepOpen = false, 1500);
+            later();
+        });
+    }
+
+    private String[] dataKeys() {
+        String op = tele.getNetworkOperatorName();
+        if (op == null || op.isEmpty()) return new String[]{"dữ liệu di động", "mobile data", "dữ liệu"};
+        return new String[]{"dữ liệu di động", "mobile data", "dữ liệu", op.toLowerCase()};
     }
 
     private void key(int code) {
@@ -185,13 +217,16 @@ final class ControlCenter {
 
         // Hàng 1: Wi-Fi + dữ liệu di động
         Tile w = tile("📶", "Wi-Fi", "", true);
-        bind(w, () -> wifi.isWifiEnabled(), () -> go(new Intent(
-                Build.VERSION.SDK_INT >= 29 ? Settings.Panel.ACTION_INTERNET_CONNECTIVITY : Settings.ACTION_WIFI_SETTINGS)));
+        bind(w, () -> wifi.isWifiEnabled(), () -> {
+            boolean ok = false;
+            try { ok = wifi.setWifiEnabled(!wifi.isWifiEnabled()); } catch (Exception ignored) { }
+            if (ok) later(); else viaQs("wi-fi", "wifi", "wlan");
+        });
         refreshers.add(() -> w.sub.setText(Ui.up(wifi.isWifiEnabled() ? "Đang bật" : "Đã tắt")));
         place(w.root, 0, 0, 1, 2);
 
         Tile d = tile("⇅", "Dữ liệu di động", "", true);
-        bind(d, this::cellular, () -> go(new Intent(Settings.ACTION_DATA_ROAMING_SETTINGS)));
+        bind(d, this::cellular, () -> viaQs(dataKeys()));
         refreshers.add(() -> {
             String op = tele.getNetworkOperatorName();
             d.title.setText(Ui.up(op == null || op.isEmpty() ? "Dữ liệu di động" : op));
@@ -248,24 +283,28 @@ final class ControlCenter {
 
         // Hàng 3: Bluetooth, máy bay, điểm phát sóng, khóa xoay
         Tile bt = tile("🔷", "Bluetooth", "", false);
-        bind(bt, null, () -> go(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)));
+        bind(bt, () -> {
+            try {
+                BluetoothAdapter ad = BluetoothAdapter.getDefaultAdapter();
+                return ad != null && ad.isEnabled();
+            } catch (Exception e) { return false; }
+        }, () -> {
+            boolean ok = false;
+            try {
+                BluetoothAdapter ad = BluetoothAdapter.getDefaultAdapter();
+                if (ad != null) ok = ad.isEnabled() ? ad.disable() : ad.enable();
+            } catch (Exception ignored) { }
+            if (ok) later(); else viaQs("bluetooth");
+        });
         place(bt.root, 3, 0, 1, 1);
 
         Tile air = tile("✈", "Máy bay", "", false);
         bind(air, () -> Settings.Global.getInt(a.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 0) == 1,
-                () -> go(new Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS)));
+                () -> viaQs("chế độ máy bay", "máy bay", "airplane", "flight mode"));
         place(air.root, 3, 1, 1, 1);
 
         Tile hot = tile("◉", "Phát Wi-Fi", "", false);
-        bind(hot, null, () -> {
-            Intent i = new Intent().setClassName("com.android.settings", "com.android.settings.TetherSettings");
-            try {
-                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                a.startActivity(i);
-            } catch (Exception e) {
-                go(new Intent(Settings.ACTION_WIRELESS_SETTINGS));
-            }
-        });
+        bind(hot, null, () -> viaQs("điểm phát sóng", "phát wi-fi", "điểm phát wi-fi", "hotspot", "điểm truy cập"));
         place(hot.root, 3, 2, 1, 1);
 
         Tile rot = tile("🔒", "Khóa xoay", "", false);
@@ -295,11 +334,11 @@ final class ControlCenter {
 
         Tile dark = tile("🌓", "Chế độ tối", "", false);
         bind(dark, () -> (a.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
-                == Configuration.UI_MODE_NIGHT_YES, () -> go(new Intent(Settings.ACTION_DISPLAY_SETTINGS)));
+                == Configuration.UI_MODE_NIGHT_YES, () -> viaQs("chế độ tối", "giao diện tối", "dark mode", "dark"));
         place(dark.root, 4, 1, 1, 1);
 
         Tile saver = tile("🔋", "Tiết kiệm pin", "", false);
-        bind(saver, () -> power.isPowerSaveMode(), () -> go(new Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS)));
+        bind(saver, () -> power.isPowerSaveMode(), () -> viaQs("tiết kiệm pin", "tiết kiệm điện", "battery saver", "power saving"));
         place(saver.root, 4, 2, 1, 1);
 
         Tile torch = tile("🔦", "Đèn pin", "", false);
@@ -314,11 +353,11 @@ final class ControlCenter {
 
         // Hàng 5: vị trí, bảo vệ mắt
         Tile pos = tile("📍", "Vị trí", "", false);
-        bind(pos, this::locationOn, () -> go(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)));
+        bind(pos, this::locationOn, () -> viaQs("vị trí", "định vị", "location", "gps"));
         place(pos.root, 5, 0, 1, 1);
 
         Tile eye = tile("👁", "Bảo vệ mắt", "", false);
-        bind(eye, null, () -> go(new Intent(Settings.ACTION_DISPLAY_SETTINGS)));
+        bind(eye, null, () -> viaQs("bảo vệ mắt", "eye comfort", "eye protection", "chế độ đọc"));
         place(eye.root, 5, 1, 1, 1);
 
         // Theo dõi trạng thái đèn pin
