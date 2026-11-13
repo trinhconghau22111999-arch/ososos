@@ -178,7 +178,7 @@
                     android:layout_weight="1"
                     android:fontFamily="sans-serif-condensed"
                     android:letterSpacing="0.14"
-                    android:text="TRUNG TÂM ĐIỀU KHIỂN"
+                    android:text="TIỆN ÍCH"
                     android:textColor="#00E5FF"
                     android:textSize="20sp"
                     android:textStyle="bold" />
