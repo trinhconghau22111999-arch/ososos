@@ -21,6 +21,20 @@
                 android:orientation="vertical"
                 android:padding="18dp">
 
+                <TextView
+                    android:id="@+id/ctlBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_accent"
+                    android:paddingBottom="6dp"
+                    android:paddingLeft="14dp"
+                    android:paddingRight="14dp"
+                    android:paddingTop="6dp"
+                    android:text="Trung tâm điều khiển  ⌄"
+                    android:textColor="#00E5FF"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
                 <TextClock
                     android:id="@+id/clock"
                     android:layout_width="wrap_content"
@@ -72,13 +86,6 @@
                     android:textColor="#7F8BC0"
                     android:textSize="15sp" />
 
-                <LinearLayout
-                    android:id="@+id/quickRow"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:orientation="horizontal" />
-
                 <GridLayout
                     android:id="@+id/favGrid"
                     android:layout_width="match_parent"
@@ -86,27 +93,7 @@
                     android:layout_marginTop="8dp"
                     android:columnCount="4" />
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:background="@drawable/bg_panel"
-                    android:orientation="vertical"
-                    android:padding="12dp">
-
-                    <TextView
-                        android:id="@+id/volLabel"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:textColor="#00E5FF"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <SeekBar
-                        android:id="@+id/vol"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
-                </LinearLayout>
+                
             </LinearLayout>
         </ScrollView>
 
@@ -152,5 +139,81 @@
             android:horizontalSpacing="4dp"
             android:numColumns="4"
             android:verticalSpacing="8dp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/ccPanel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#F20D1224"
+        android:orientation="vertical"
+        android:paddingBottom="8dp"
+        android:paddingLeft="14dp"
+        android:paddingRight="14dp"
+        android:paddingTop="14dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/ccHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Trung tâm điều khiển"
+                    android:textColor="#00E5FF"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/ccSettings"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:padding="6dp"
+                    android:text="⚙"
+                    android:textColor="#FFFFFF"
+                    android:textSize="24sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/ccInfo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="#7F8BC0"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="10dp"
+            android:layout_weight="1"
+            android:scrollbars="none">
+
+            <GridLayout
+                android:id="@+id/ccGrid"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:columnCount="4" />
+        </ScrollView>
+
+        <TextView
+            android:id="@+id/ccFooter"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:padding="14dp"
+            android:text="⌃  Vuốt lên hoặc chạm để đóng"
+            android:textColor="#7F8BC0"
+            android:textSize="13sp" />
     </LinearLayout>
 </FrameLayout>

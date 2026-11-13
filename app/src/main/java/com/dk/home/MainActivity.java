@@ -7,7 +7,9 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
+import android.view.MotionEvent;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.BatteryManager;
@@ -15,7 +17,6 @@ import android.os.Bundle;
 import android.provider.AlarmClock;
 import android.provider.MediaStore;
 import android.provider.Settings;
-import android.content.res.ColorStateList;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
@@ -28,7 +29,6 @@ import android.widget.GridLayout;
 import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -49,8 +49,10 @@ public class MainActivity extends Activity {
     private AudioManager audio;
     private View drawer;
     private EditText search;
-    private TextView battery, volLabel;
-    private SeekBar vol;
+    private TextView battery;
+    private View ccPanel, ccHeader, ccFooter;
+    private ControlCenter cc;
+    private float downY;
     private final List<App> all = new ArrayList<>();
     private final List<App> shown = new ArrayList<>();
     private AppAdapter adapter;
@@ -68,14 +70,19 @@ public class MainActivity extends Activity {
         drawer = findViewById(R.id.drawer);
         search = findViewById(R.id.search);
         battery = findViewById(R.id.battery);
-        volLabel = findViewById(R.id.volLabel);
-        vol = findViewById(R.id.vol);
+        ccPanel = findViewById(R.id.ccPanel);
+        ccHeader = findViewById(R.id.ccHeader);
+        ccFooter = findViewById(R.id.ccFooter);
 
         findViewById(R.id.searchBar).setOnClickListener(v -> openDrawer());
-        buildQuick();
         buildFavorites();
         buildDock();
-        buildVolume();
+
+        cc = new ControlCenter(this, (android.widget.GridLayout) findViewById(R.id.ccGrid),
+                (TextView) findViewById(R.id.ccInfo), this::closeCc);
+        findViewById(R.id.ctlBtn).setOnClickListener(v -> openCc());
+        ccFooter.setOnClickListener(v -> closeCc());
+        findViewById(R.id.ccSettings).setOnClickListener(v -> go(new Intent(Settings.ACTION_SETTINGS)));
 
         adapter = new AppAdapter();
         GridView grid = findViewById(R.id.appGrid);
@@ -107,18 +114,57 @@ public class MainActivity extends Activity {
             int scale = bat.getIntExtra(BatteryManager.EXTRA_SCALE, 100);
             if (level >= 0) battery.setText("Pin " + (level * 100 / scale) + "%");
         }
-        syncVolume();
+        cc.refresh();
     }
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         closeDrawer();
+        closeCc();
+    }
+
+    @Override
+    protected void onDestroy() {
+        cc.release();
+        super.onDestroy();
+    }
+
+    private void openCc() {
+        cc.refresh();
+        ccPanel.setVisibility(View.VISIBLE);
+    }
+
+    private void closeCc() {
+        ccPanel.setVisibility(View.GONE);
+    }
+
+    private boolean hit(View v, float rawY) {
+        int[] l = new int[2];
+        v.getLocationOnScreen(l);
+        return rawY >= l[1] && rawY <= l[1] + v.getHeight();
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent e) {
+        if (e.getAction() == MotionEvent.ACTION_DOWN) {
+            downY = e.getRawY();
+        } else if (e.getAction() == MotionEvent.ACTION_UP) {
+            float dy = e.getRawY() - downY;
+            if (ccPanel.getVisibility() == View.VISIBLE) {
+                if (dy < -dp(90) && (hit(ccHeader, downY) || hit(ccFooter, downY))) closeCc();
+            } else if (drawer.getVisibility() != View.VISIBLE
+                    && downY < getResources().getDisplayMetrics().heightPixels * 0.4f && dy > dp(100)) {
+                openCc();
+            }
+        }
+        return super.dispatchTouchEvent(e);
     }
 
     @Override
     public void onBackPressed() {
-        if (drawer.getVisibility() == View.VISIBLE) closeDrawer();
+        if (ccPanel.getVisibility() == View.VISIBLE) closeCc();
+        else if (drawer.getVisibility() == View.VISIBLE) closeDrawer();
         // Là màn hình chính nên không thoát khi nhấn Back
     }
 
@@ -131,29 +177,6 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             Toast.makeText(this, "Không mở được ứng dụng này", Toast.LENGTH_SHORT).show();
         }
-    }
-
-    private void buildQuick() {
-        LinearLayout row = findViewById(R.id.quickRow);
-        addQuick(row, "📶", "Wi-Fi", Settings.ACTION_WIFI_SETTINGS);
-        addQuick(row, "🔷", "Bluetooth", Settings.ACTION_BLUETOOTH_SETTINGS);
-        addQuick(row, "🔊", "Âm thanh", Settings.ACTION_SOUND_SETTINGS);
-        addQuick(row, "☀", "Màn hình", Settings.ACTION_DISPLAY_SETTINGS);
-    }
-
-    private void addQuick(LinearLayout row, String glyph, String label, final String action) {
-        TextView t = new TextView(this);
-        t.setText(glyph + "\n" + label);
-        t.setGravity(Gravity.CENTER);
-        t.setTextColor(Color.WHITE);
-        t.setTextSize(12);
-        t.setBackgroundResource(R.drawable.bg_panel);
-        t.setPadding(0, dp(12), 0, dp(10));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        lp.setMargins(dp(3), 0, dp(3), 0);
-        t.setLayoutParams(lp);
-        t.setOnClickListener(v -> go(new Intent(action)));
-        row.addView(t);
     }
 
     private Intent sel(String category) {
@@ -233,24 +256,6 @@ public class MainActivity extends Activity {
         lp.setMargins(dp(3), 0, dp(3), 0);
         all.setOnClickListener(v -> openDrawer());
         dock.addView(all, lp);
-    }
-
-    private void buildVolume() {
-        vol.setMax(audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
-        vol.setProgressTintList(ColorStateList.valueOf(0xFF00E5FF));
-        vol.setThumbTintList(ColorStateList.valueOf(0xFFFFFFFF));
-        vol.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar s, int p, boolean fromUser) {
-                if (fromUser) audio.setStreamVolume(AudioManager.STREAM_MUSIC, p, 0);
-                volLabel.setText("Âm lượng  " + (p * 100 / Math.max(1, s.getMax())));
-            }
-            public void onStartTrackingTouch(SeekBar s) { }
-            public void onStopTrackingTouch(SeekBar s) { }
-        });
-    }
-
-    private void syncVolume() {
-        vol.setProgress(audio.getStreamVolume(AudioManager.STREAM_MUSIC));
     }
 
     // ---------- Tất cả ứng dụng ----------
