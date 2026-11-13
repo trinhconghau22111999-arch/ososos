@@ -697,6 +697,7 @@ final class BrowserPage extends LinearLayout {
         box.addView(note);
         box.addView(menuRow("Lịch sử trang", () -> { d.dismiss(); showHistory(); }));
         box.addView(menuRow("Lịch sử tìm kiếm", () -> { d.dismiss(); showSearches(); }));
+        box.addView(menuRow("Đổi trình duyệt", () -> { d.dismiss(); act.switchBrowser(); }));
         box.addView(menuRow("Xóa toàn bộ lịch sử", () -> {
             hist.clear();
             searches.clear();

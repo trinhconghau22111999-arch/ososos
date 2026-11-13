@@ -112,6 +112,10 @@ public class MainActivity extends Activity {
     private FrameLayout qsbHolder;
     private int qsbId = -1;
     private BrowserPage br;
+    // "Duyệt web" kiểu Webandr (chép từ Mac-Os): thay cho BrowserPage sau khi bấm "Đổi trình duyệt" trong Cài đặt trình duyệt.
+    private BrowserHost webandr;
+    private static final String KEY_WEBANDR = "browser_webandr";
+    private boolean useWebandr;
     private AiAssistant ai;
     private boolean brActive;
     private View customView;
@@ -179,6 +183,8 @@ public class MainActivity extends Activity {
         brPanel = findViewById(R.id.brPanel);
         br = new BrowserPage(this);
         ((ViewGroup) brPanel).addView(br, new FrameLayout.LayoutParams(-1, -1));
+        useWebandr = getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(KEY_WEBANDR, false);
+        if (useWebandr) applyBrowserEngine();
         touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
         qsbHolder = findViewById(R.id.qsbHolder);
         try {
@@ -256,6 +262,10 @@ public class MainActivity extends Activity {
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (webandr != null && requestCode >= 2100 && requestCode < 2200) {
+            webandr.handlePermissionsResult(requestCode, permissions, grantResults);
+            return;
+        }
         if (requestCode == REQ_YT_MIC) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) startYtVoice();
             else Toast.makeText(this, "Cần cấp quyền micro để tìm kiếm bằng giọng nói", Toast.LENGTH_SHORT).show();
@@ -309,6 +319,7 @@ public class MainActivity extends Activity {
         if (tv != null) tv.onAppPause();
         if (rc != null) rc.setActive(false);
         if (br != null) br.pause();
+        if (webandr != null) { try { webandr.onPause(); } catch (Exception e) { } }
         super.onPause();
     }
 
@@ -322,12 +333,14 @@ public class MainActivity extends Activity {
         if (tv != null) tv.destroy();
         if (rc != null) rc.destroy();
         if (br != null) br.destroy();
+        if (webandr != null) { try { webandr.destroy(); } catch (Exception e) { } webandr = null; }
         cc.release();
         super.onDestroy();
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (webandr != null && webandr.handleActivityResult(requestCode, resultCode, data)) return;
         if (requestCode == RemotePage.REQ_VOICE) {
             if (rc != null) rc.onVoiceResult(resultCode, data);
         } else if (requestCode == REQ_YT_VOICE) {
@@ -366,7 +379,9 @@ public class MainActivity extends Activity {
         if (pos < 0f) {
             if (yt.canGoBack()) yt.goBack(); else animateTo(0f);
         } else if (pos > 1f) {
-            if (!br.onBack()) animateTo(1f);   // trình duyệt: lùi trang, hết lịch sử thì về trang Tiện ích
+            // trình duyệt: lùi trang, hết lịch sử thì về trang Tiện ích
+            boolean handled = useWebandr && webandr != null ? webandr.back() : br.onBack();
+            if (!handled) animateTo(1f);
         } else if (pos > 0f) {
             animateTo(0f);
         } else {
@@ -485,6 +500,36 @@ public class MainActivity extends Activity {
         int[] l = new int[2];
         v.getLocationOnScreen(l);
         return rawY >= l[1] && rawY <= l[1] + v.getHeight();
+    }
+
+    // ---------- Đổi trình duyệt: BrowserPage <-> "Duyệt web" kiểu Webandr ----------
+
+    /** Gọi từ nút "Đổi trình duyệt" trong Cài đặt trình duyệt: từ nay dùng "Duyệt web" kiểu Webandr và nhớ lựa chọn. */
+    void switchBrowser() {
+        useWebandr = true;
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_WEBANDR, true).apply();
+        applyBrowserEngine();
+    }
+
+    /** Hiện đúng trình duyệt đang chọn trong vùng trang trình duyệt (brPanel). */
+    private void applyBrowserEngine() {
+        if (useWebandr) {
+            if (webandr == null) {
+                webandr = new BrowserHost(this, new kotlin.jvm.functions.Function0<kotlin.Unit>() {
+                    @Override public kotlin.Unit invoke() {
+                        animateTo(1f);          // đóng "Duyệt web" thì về trang Tiện ích, như Back của trình duyệt cũ
+                        return kotlin.Unit.INSTANCE;
+                    }
+                });
+                webandr.start(null);
+                ((ViewGroup) brPanel).addView(webandr.getRoot(), new FrameLayout.LayoutParams(-1, -1));
+            }
+            br.setVisibility(View.GONE);
+            webandr.getRoot().setVisibility(View.VISIBLE);
+        } else {
+            if (webandr != null) webandr.getRoot().setVisibility(View.GONE);
+            br.setVisibility(View.VISIBLE);
+        }
     }
 
     // ---------- YouTube (màn hình bên phải) ----------

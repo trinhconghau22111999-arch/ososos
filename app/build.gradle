@@ -50,5 +50,8 @@ dependencies {
     // Trang Điều khiển: Firebase (tín hiệu) + WebRTC (kênh lệnh), cùng phiên bản với repo cha
     implementation platform('com.google.firebase:firebase-bom:33.1.2')
     implementation 'com.google.firebase:firebase-database-ktx'
+    // "Duyệt web" kiểu Webandr (chép từ Mac-Os): WebView mới (WebViewCompat, WebViewAssetLoader), mã hoá mật khẩu đã lưu
+    implementation 'androidx.webkit:webkit:1.11.0'
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
     implementation 'io.github.webrtc-sdk:android:125.6422.06.1'
 }
