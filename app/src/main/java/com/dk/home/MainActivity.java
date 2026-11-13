@@ -255,10 +255,12 @@ public class MainActivity extends Activity {
         super.onResume();
         appPaused = false;
         syncTruyen();
-        if (yt != null) yt.onResume();
+        // Chạy lại bộ hẹn giờ JS (đã tạm dừng khi app ra nền). resumeTimers() áp dụng cho mọi WebView của app.
+        if (yt != null) { yt.onResume(); yt.resumeTimers(); }
         if (tv != null) tv.onAppResume();
         if (rc != null) rc.setActive(rcActive);
         if (br != null) br.resume();
+        syncBrowserHost();
         ensureDark();
         reloadApps();
         Intent bat = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
@@ -327,11 +329,14 @@ public class MainActivity extends Activity {
         appPaused = true;
         syncTruyen();
         if (ai != null) ai.cancel();
-        if (yt != null) yt.onPause();
+        // WebView.onPause() không dừng JavaScript; pauseTimers() mới dừng setInterval/setTimeout
+        // (chặn quảng cáo 150ms, bỏ qua quảng cáo 250ms, nút mic 1s...). Áp dụng cho mọi WebView của app.
+        if (yt != null) { yt.onPause(); yt.pauseTimers(); }
         if (tv != null) tv.onAppPause();
         if (rc != null) rc.setActive(false);
         if (br != null) br.pause();
         if (webandr != null) { try { webandr.onPause(); } catch (Exception e) { } }
+        syncBrowserHost();
         super.onPause();
     }
 
@@ -443,6 +448,7 @@ public class MainActivity extends Activity {
         if (br != null && brAct != brActive) {
             brActive = brAct;
             br.setActive(brAct);
+            syncBrowserHost();
         }
         // Trang TV chỉ bật khi đã dừng hẳn ở trang đó (không bật giữa lúc đang vuốt, tránh khựng)
         boolean tvAct = Math.abs(pos + 2f) < 0.02f;
@@ -458,6 +464,11 @@ public class MainActivity extends Activity {
             rc.setActive(rcAct);
         }
         syncTruyen();
+    }
+
+    /** Vòng quét nền của "Duyệt web" mới chỉ chạy khi trang trình duyệt đang hiện và app đang ở trước. */
+    private void syncBrowserHost() {
+        if (webandr != null) webandr.setRunning(!appPaused && brActive);
     }
 
     /** Trang Truyền tệp chỉ kết nối khi đang dừng hẳn ở trang đó và app đang hiện (không chạy nền). */
@@ -571,6 +582,7 @@ public class MainActivity extends Activity {
                 });
                 webandr.start(null);
                 ((ViewGroup) brPanel).addView(webandr.getRoot(), new FrameLayout.LayoutParams(-1, -1));
+                syncBrowserHost();
             }
             br.setVisibility(View.GONE);
             webandr.getRoot().setVisibility(View.VISIBLE);

@@ -1050,7 +1050,7 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
 
     // Cau noi: khi bam vao o email o trang dang nhap Google thi app hien danh sach tai khoan de chon.
     private val ACCT_HOOK_JS = "(function(){if(window.__wbAcct)return;window.__wbAcct=1;" +
-        "function hook(){var i=document.querySelector('input[type=email],#identifierId,input[name=identifier]');" +
+        "function hook(){if(document.hidden)return;var i=document.querySelector('input[type=email],#identifierId,input[name=identifier]');" +
         "if(!i||i.__wbh)return;i.__wbh=1;" +
         "var f=function(){if(i.value)return;try{AndroidAcct.postMessage('pick')}catch(e){}};" +
         "i.addEventListener('focus',f);i.addEventListener('click',f);" +
@@ -2347,11 +2347,22 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
             "for(var i=0;i<m.length;i++){var e=m[i];if(!e.paused&&!e.ended&&e.readyState>2)return true}}" +
             "catch(x){}return false})()"
 
+    /** Vòng quét chỉ chạy khi trang Duyệt web đang hiện và app ở trước (MainActivity gọi setRunning). */
+    private var running = true
+
     private val sweep = object : Runnable {
         override fun run() {
+            if (!running) return
             try { sweepBackground() } catch (e: Exception) { }
             ui.postDelayed(this, SWEEP_MS)
         }
+    }
+
+    fun setRunning(on: Boolean) {
+        if (on == running) return
+        running = on
+        ui.removeCallbacks(sweep)
+        if (on) ui.postDelayed(sweep, 500L)   // quay lại: quét sớm để bắt kịp các thẻ nền
     }
 
     private fun sweepBackground() {

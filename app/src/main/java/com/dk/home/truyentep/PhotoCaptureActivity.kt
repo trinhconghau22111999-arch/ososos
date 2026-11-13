@@ -389,6 +389,9 @@ class PhotoCaptureActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         TruyenTepHub.childStarted()
+        // Đồng hồ ghi giờ đã dừng ở onStop: chạy lại khi màn hình hiện ra.
+        clockHandler.removeCallbacks(clockRunnable)
+        if (timestampOn && ::textTimestampOverlay.isInitialized) clockHandler.post(clockRunnable)
         // Dang ky NGAY khi man hinh hien ra de goc tren-trai luon phan anh dung trang thai -
         // service co the da chay tu truoc (vd. quay lai man hinh nay tu Recents).
         statusListenerHandler.post(registerStatusListenerRunnable)
@@ -404,6 +407,7 @@ class PhotoCaptureActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
+        clockHandler.removeCallbacks(clockRunnable)   // màn hình đã dừng: không cập nhật đồng hồ mỗi giây nữa
         TruyenTepHub.childStopped()
         statusListenerHandler.removeCallbacks(registerStatusListenerRunnable)
         TruyenTepHub.instance?.removeConnectionStatusListener(connectionStatusListener)

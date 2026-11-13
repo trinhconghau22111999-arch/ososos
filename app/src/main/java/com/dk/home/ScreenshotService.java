@@ -29,7 +29,15 @@ public class ScreenshotService extends AccessibilityService {
     @Override
     public boolean onUnbind(android.content.Intent intent) {
         instance = null;
+        h.removeCallbacksAndMessages(null);   // hủy các lần thử bấm nút còn chờ, không để Handler giữ dịch vụ
         return super.onUnbind(intent);
+    }
+
+    @Override
+    public void onDestroy() {
+        instance = null;
+        h.removeCallbacksAndMessages(null);
+        super.onDestroy();
     }
 
     @Override

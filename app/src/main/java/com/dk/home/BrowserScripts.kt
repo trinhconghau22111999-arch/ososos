@@ -106,6 +106,8 @@ internal val YT_AD_JS = """
  var mutedByUs=false,fastByUs=false;
  function tick(){
   try{
+   // Trang đang ẩn và không phát gì thì không cần dò quảng cáo (vẫn chạy nếu đang phát nhạc/video nền).
+   if(document.hidden){var hv=document.querySelector('video');if(!hv||hv.paused)return;}
    var on=window.__wbAdSkip!==false;
    var st=document.getElementById('__wb_adcss');
    if(on&&!st&&document.documentElement){st=document.createElement('style');st.id='__wb_adcss';st.textContent=HIDE;document.documentElement.appendChild(st);}
@@ -138,6 +140,7 @@ const val VOICE_HOOK_JS = """
  function txt(el){return ((el.getAttribute('aria-label')||'')+' '+(el.getAttribute('title')||'')).toLowerCase();}
  function has(t){for(var i=0;i<L.length;i++){if(t.indexOf(L[i])!==-1)return true;}return false;}
  function hook(){
+  if(document.hidden)return;
   Array.prototype.forEach.call(document.querySelectorAll('button,[role="button"],a,div[aria-label],span[aria-label]'),function(el){
    if(el.__dmVoice)return;
    if(!has(txt(el)))return;

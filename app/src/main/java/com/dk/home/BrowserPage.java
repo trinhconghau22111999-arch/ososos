@@ -931,13 +931,20 @@ final class BrowserPage extends LinearLayout {
     }
 
     void pause() {
-        for (Tab t : tabs) if (t.web != null) t.web.onPause();
+        for (Tab t : tabs) {
+            if (t.web == null) continue;
+            t.web.onPause();
+            t.web.pauseTimers();   // onPause() không dừng JavaScript; pauseTimers() mới dừng bộ hẹn giờ của trang
+        }
         save();
     }
 
     void resume() {
         Tab t = tabs.isEmpty() ? null : current();
-        if (t != null && t.web != null) t.web.onResume();
+        if (t != null && t.web != null) {
+            t.web.onResume();
+            t.web.resumeTimers();
+        }
     }
 
     void destroy() {

@@ -20,6 +20,7 @@
   }
 
   function hookVoiceButtons() {
+    if (document.hidden) return;
     document.querySelectorAll('button, [role="button"], a').forEach(function (el) {
       if (el.__hauosVoiceBound || !isVoiceButton(el)) return;
       el.__hauosVoiceBound = true;

@@ -14,6 +14,7 @@
 
   function blockAds() {
     try {
+      if (document.hidden) return;   // trang ẩn (đang ở màn hình khác / app ra nền): không dò quảng cáo
       var player = document.querySelector('.html5-video-player');
       var video = document.querySelector('video');
       var isAd = player && /ad-showing|ad-interrupting/.test(player.className || '');
