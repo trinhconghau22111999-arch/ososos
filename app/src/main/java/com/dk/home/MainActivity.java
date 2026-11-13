@@ -511,13 +511,26 @@ public class MainActivity extends Activity {
         applyBrowserEngine();
     }
 
+    /** Đóng "Duyệt web" (Webandr) và mở lại trình duyệt cũ; lựa chọn được lưu. */
+    void switchBackToOldBrowser() {
+        useWebandr = false;
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_WEBANDR, false).apply();
+        if (webandr != null) {
+            View v = webandr.getRoot();
+            if (v.getParent() instanceof ViewGroup) ((ViewGroup) v.getParent()).removeView(v);
+            try { webandr.destroy(); } catch (Exception e) { }
+            webandr = null;
+        }
+        applyBrowserEngine();
+    }
+
     /** Hiện đúng trình duyệt đang chọn trong vùng trang trình duyệt (brPanel). */
     private void applyBrowserEngine() {
         if (useWebandr) {
             if (webandr == null) {
                 webandr = new BrowserHost(this, new kotlin.jvm.functions.Function0<kotlin.Unit>() {
                     @Override public kotlin.Unit invoke() {
-                        animateTo(1f);          // đóng "Duyệt web" thì về trang Tiện ích, như Back của trình duyệt cũ
+                        switchBackToOldBrowser();   // nút X của "Duyệt web" (đã xác nhận): đóng và mở lại trình duyệt cũ
                         return kotlin.Unit.INSTANCE;
                     }
                 });

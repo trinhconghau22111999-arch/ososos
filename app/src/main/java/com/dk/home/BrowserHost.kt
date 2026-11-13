@@ -612,10 +612,13 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
         Toast.makeText(this, "Đang dịch sang tiếng Việt…", Toast.LENGTH_SHORT).show()
     }
 
-    // Ve man hinh chinh Android; app van chay nen, mo lai se giu nguyen cac tab.
+    // Nut X: hoi xac nhan, roi dong "Duyet web" va mo lai trinh duyet cu (xu ly o MainActivity qua onClose).
     private fun goHome() {
-        // Nhúng trong Desktop Mini: đóng cửa sổ Duyệt web; màn hình riêng: đóng màn hình, về Desktop Mini
-        finish()
+        AlertDialog.Builder(act)
+            .setMessage("Đóng \"Duyệt web\" và mở lại trình duyệt cũ?")
+            .setPositiveButton("Đóng") { _, _ -> finish() }
+            .setNegativeButton("Hủy", null)
+            .show()
     }
 
     private fun hideKeyboard() {
