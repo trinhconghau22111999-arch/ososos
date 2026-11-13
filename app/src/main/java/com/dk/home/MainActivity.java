@@ -727,15 +727,43 @@ public class MainActivity extends Activity {
         return c >= 4 ? 10 : c == 3 ? 12 : c == 2 ? 14 : 16;
     }
 
-    /** Đổi số ứng dụng trên một hàng (1 đến 4) và lưu lại. */
+    /** Đổi số ứng dụng trên một hàng (1 đến 4) và lưu lại. Chỉnh kích thước tại chỗ, không dựng lại các ô. */
     private void setCols(int n) {
         n = Math.max(1, Math.min(4, n));
         if (n == cols) return;
         cols = n;
-        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putInt("cols", cols).apply();
-        grid.setColumnCount(cols);
-        signature = "";
-        reloadApps();
+        try {
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putInt("cols", cols).apply();
+            grid.setColumnCount(cols);
+            restyleTiles();
+        } catch (Exception ex) {
+            // Phòng khi bố cục lỗi: dựng lại từ đầu một lần
+            try {
+                signature = "";
+                reloadApps();
+            } catch (Exception ignored) { }
+        }
+    }
+
+    private void restyleTiles() {
+        int icon = dp(iconDpFor(cols));
+        int sp = textSpFor(cols);
+        for (int i = 0; i < grid.getChildCount(); i++) {
+            View v = grid.getChildAt(i);
+            if (!(v instanceof LinearLayout)) continue;
+            LinearLayout ll = (LinearLayout) v;
+            if (ll.getChildCount() < 2) continue;
+            View iv = ll.getChildAt(0);
+            ViewGroup.LayoutParams lp = iv.getLayoutParams();
+            if (lp != null) {
+                lp.width = icon;
+                lp.height = icon;
+                iv.setLayoutParams(lp);
+            }
+            View tv = ll.getChildAt(1);
+            if (tv instanceof TextView) ((TextView) tv).setTextSize(sp);
+        }
+        grid.requestLayout();
     }
 
     /** Đưa toàn bộ ứng dụng lên màn hình chính. */
