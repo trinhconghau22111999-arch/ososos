@@ -150,6 +150,8 @@ public class MainActivity extends Activity {
         touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
 
         findViewById(R.id.clockPanel).setBackground(Ui.panel(this, Ui.GRID));
+        findViewById(R.id.clock).setOnClickListener(v -> openClockApp());
+        findViewById(R.id.date).setOnClickListener(v -> openCalendarApp());
         search.setBackground(Ui.panel(this, Ui.PLAIN));
         battery.setBackground(Ui.panel(this, Ui.HOT, 8));
 
@@ -583,6 +585,44 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             Toast.makeText(this, "Không mở được ứng dụng này", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    /** Thử lần lượt các cách mở; cách nào mở được thì dừng. */
+    private boolean launchFirst(List<Intent> tries) {
+        for (Intent i : tries) {
+            if (i == null) continue;
+            try {
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(i);
+                return true;
+            } catch (Exception ignored) { }
+        }
+        return false;
+    }
+
+    private void addPkgs(List<Intent> tries, String... pkgs) {
+        for (String p : pkgs) tries.add(pm.getLaunchIntentForPackage(p));
+    }
+
+    /** Chạm vào giờ: mở ứng dụng Đồng hồ có sẵn trên máy. */
+    private void openClockApp() {
+        List<Intent> t = new ArrayList<>();
+        t.add(new Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS));
+        addPkgs(t, "com.google.android.deskclock", "com.android.deskclock", "com.sec.android.app.clockpackage",
+                "com.coloros.alarmclock", "com.oplus.alarmclock", "com.oneplus.deskclock", "com.miui.clock",
+                "com.huawei.deskclock", "com.vivo.alarmclock");
+        if (!launchFirst(t)) Toast.makeText(this, "Không tìm thấy ứng dụng Đồng hồ", Toast.LENGTH_SHORT).show();
+    }
+
+    /** Chạm vào thứ, ngày, tháng: mở ứng dụng Lịch có sẵn trên máy. */
+    private void openCalendarApp() {
+        List<Intent> t = new ArrayList<>();
+        t.add(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALENDAR));
+        t.add(new Intent(Intent.ACTION_VIEW, android.content.ContentUris.withAppendedId(
+                Uri.parse("content://com.android.calendar/time"), System.currentTimeMillis())));
+        addPkgs(t, "com.google.android.calendar", "com.android.calendar", "com.samsung.android.calendar",
+                "com.coloros.calendar", "com.oplus.calendar", "com.miui.calendar", "com.huawei.calendar");
+        if (!launchFirst(t)) Toast.makeText(this, "Không tìm thấy ứng dụng Lịch", Toast.LENGTH_SHORT).show();
     }
 
     private void resetSearch() {
