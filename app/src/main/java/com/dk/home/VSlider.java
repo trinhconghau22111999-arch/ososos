@@ -5,7 +5,9 @@ import android.graphics.Canvas;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.PorterDuff;
 import android.graphics.Shader;
+import android.graphics.drawable.Drawable;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -15,7 +17,7 @@ public class VSlider extends View {
 
     private int max;
     private int value;
-    private final String glyph;
+    private Drawable icon;
     private final int c1, c2;
     private final Paint bg = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -25,9 +27,9 @@ public class VSlider extends View {
     private final Path path = new Path();
     private Listener listener;
 
-    public VSlider(Context c, String glyph, int c1, int c2, int max) {
+    public VSlider(Context c, int iconRes, int c1, int c2, int max) {
         super(c);
-        this.glyph = glyph;
+        setIcon(iconRes);
         this.c1 = c1;
         this.c2 = c2;
         this.max = Math.max(1, max);
@@ -41,6 +43,16 @@ public class VSlider extends View {
         glow.setColor((c1 & 0x00FFFFFF) | 0x33000000);
         text.setTextSize(26 * d);
         text.setTextAlign(Paint.Align.CENTER);
+    }
+
+    public void setIcon(int res) {
+        Drawable d = getContext().getDrawable(res);
+        if (d != null) {
+            d = d.mutate();
+            d.setColorFilter(0xFFFFFFFF, PorterDuff.Mode.SRC_IN);
+        }
+        icon = d;
+        invalidate();
     }
 
     public void setListener(Listener l) { listener = l; }
@@ -76,8 +88,11 @@ public class VSlider extends View {
         canvas.drawRect(0, h * (1f - (float) value / max), w, h, fill);
         canvas.restore();
         canvas.drawPath(path, stroke);
-        text.setColor(0xFFFFFFFF);
-        canvas.drawText(glyph, w / 2, h - w * 0.4f, text);
+        if (icon != null) {
+            int sz = Math.round(w * 0.42f), cx = Math.round(w / 2), cy = Math.round(h - w * 0.5f);
+            icon.setBounds(cx - sz / 2, cy - sz / 2, cx + sz / 2, cy + sz / 2);
+            icon.draw(canvas);
+        }
     }
 
     @Override

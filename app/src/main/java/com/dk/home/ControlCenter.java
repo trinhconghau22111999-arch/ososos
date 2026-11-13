@@ -26,6 +26,10 @@ import android.telephony.TelephonyManager;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
+import android.graphics.Color;
+import android.graphics.PorterDuff;
+import android.graphics.drawable.GradientDrawable;
+import android.widget.ImageView;
 import android.widget.GridLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -44,7 +48,9 @@ final class ControlCenter {
 
     private static class Tile {
         LinearLayout root;
-        TextView glyph, title, sub;
+        ImageView glyph;
+        TextView title, sub;
+        boolean pill;
     }
 
     private final Activity a;
@@ -101,14 +107,14 @@ final class ControlCenter {
         grid.addView(v, lp);
     }
 
-    private Tile tile(String glyph, String title, String sub, boolean pill) {
+    private Tile tile(int icon, String title, String sub, boolean pill) {
         Tile t = new Tile();
+        t.pill = pill;
         t.root = new LinearLayout(a);
         t.root.setBackground(Ui.panel(a, Ui.PLAIN));
-        t.glyph = new TextView(a);
-        t.glyph.setText(glyph);
-        t.glyph.setTextColor(WHITE);
-        t.glyph.setGravity(Gravity.CENTER_HORIZONTAL);
+        t.glyph = new ImageView(a);
+        t.glyph.setImageResource(icon);
+        t.glyph.setColorFilter(WHITE, PorterDuff.Mode.SRC_IN);
         t.title = new TextView(a);
         t.title.setText(Ui.up(title));
         t.title.setTextColor(WHITE);
@@ -124,7 +130,8 @@ final class ControlCenter {
             t.root.setOrientation(LinearLayout.HORIZONTAL);
             t.root.setGravity(Gravity.CENTER_VERTICAL);
             t.root.setPadding(dp(14), 0, dp(10), 0);
-            t.glyph.setTextSize(26);
+            t.glyph.setPadding(dp(9), dp(9), dp(9), dp(9));
+            t.glyph.setBackground(badge(0x33FFFFFF));
             t.title.setTextSize(15);
             t.title.setTypeface(null, android.graphics.Typeface.BOLD);
             LinearLayout col = new LinearLayout(a);
@@ -132,19 +139,19 @@ final class ControlCenter {
             col.setPadding(dp(12), 0, 0, 0);
             col.addView(t.title);
             col.addView(t.sub);
-            t.root.addView(t.glyph);
+            t.root.addView(t.glyph, new LinearLayout.LayoutParams(dp(42), dp(42)));
             t.root.addView(col);
         } else {
             t.root.setOrientation(LinearLayout.VERTICAL);
             t.root.setGravity(Gravity.CENTER);
-            t.glyph.setTextSize(24);
             t.title.setTextSize(9);
             t.title.setGravity(Gravity.CENTER);
             t.title.setPadding(dp(2), dp(2), dp(2), 0);
             t.title.setMaxLines(2);
             t.title.setLetterSpacing(0.03f);
-            t.glyph.setGravity(Gravity.CENTER);
-            t.root.addView(t.glyph, new LinearLayout.LayoutParams(-1, -2));
+            LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(dp(28), dp(28));
+            ilp.gravity = Gravity.CENTER_HORIZONTAL;
+            t.root.addView(t.glyph, ilp);
             t.root.addView(t.title, new LinearLayout.LayoutParams(-1, -2));
         }
         return t;
@@ -152,7 +159,15 @@ final class ControlCenter {
 
     private void setActive(Tile t, boolean on) {
         t.root.setBackground(Ui.panel(a, on ? Ui.ACCENT : Ui.PLAIN));
-        t.glyph.setTextColor(on ? CYAN : WHITE);
+        t.glyph.setColorFilter(on && !t.pill ? CYAN : WHITE, PorterDuff.Mode.SRC_IN);
+        if (t.pill) t.glyph.setBackground(badge(on ? 0xFF1A6BFF : 0x33FFFFFF));
+    }
+
+    private GradientDrawable badge(int color) {
+        GradientDrawable g = new GradientDrawable();
+        g.setShape(GradientDrawable.OVAL);
+        g.setColor(color);
+        return g;
     }
 
     private void bind(Tile t, State s, Runnable click) {
@@ -205,6 +220,12 @@ final class ControlCenter {
         go(new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:" + a.getPackageName())));
     }
 
+    private boolean headsetOn() {
+        try {
+            return audio.isWiredHeadsetOn() || audio.isBluetoothA2dpOn();
+        } catch (Exception e) { return false; }
+    }
+
     private boolean cellular() {
         Network n = conn.getActiveNetwork();
         NetworkCapabilities nc = n == null ? null : conn.getNetworkCapabilities(n);
@@ -222,7 +243,7 @@ final class ControlCenter {
         margin = dp(4);
 
         // Hàng 1: Wi-Fi + dữ liệu di động
-        Tile w = tile("📶", "Wi-Fi", "", true);
+        Tile w = tile(R.drawable.ic_wifi, "Wi-Fi", "", true);
         bind(w, () -> wifi.isWifiEnabled(), () -> {
             boolean ok = false;
             try { ok = wifi.setWifiEnabled(!wifi.isWifiEnabled()); } catch (Exception ignored) { }
@@ -231,7 +252,7 @@ final class ControlCenter {
         refreshers.add(() -> w.sub.setText(Ui.up(wifi.isWifiEnabled() ? "Đang bật" : "Đã tắt")));
         place(w.root, 0, 0, 1, 2);
 
-        Tile d = tile("⇅", "Dữ liệu di động", "", true);
+        Tile d = tile(R.drawable.ic_data, "Dữ liệu di động", "", true);
         bind(d, this::cellular, () -> viaQs(Settings.ACTION_DATA_ROAMING_SETTINGS, dataKeys()));
         refreshers.add(() -> {
             String op = tele.getNetworkOperatorName();
@@ -253,15 +274,14 @@ final class ControlCenter {
         mt.setGravity(Gravity.CENTER);
         media.addView(mt, new LinearLayout.LayoutParams(-1, 0, 1f));
         LinearLayout btns = new LinearLayout(a);
-        String[] g = {"⏮", "⏯", "⏭"};
+        int[] g = {R.drawable.ic_prev, R.drawable.ic_play, R.drawable.ic_next};
         int[] codes = {KeyEvent.KEYCODE_MEDIA_PREVIOUS, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_MEDIA_NEXT};
         for (int i = 0; i < 3; i++) {
             final int code = codes[i];
-            TextView b = new TextView(a);
-            b.setText(g[i]);
-            b.setTextSize(28);
-            b.setTextColor(i == 1 ? CYAN : WHITE);
-            b.setGravity(Gravity.CENTER);
+            ImageView b = new ImageView(a);
+            b.setImageResource(g[i]);
+            b.setColorFilter(i == 1 ? CYAN : WHITE, PorterDuff.Mode.SRC_IN);
+            b.setPadding(dp(12), dp(12), dp(12), dp(12));
             b.setOnClickListener(v -> key(code));
             btns.addView(b, new LinearLayout.LayoutParams(0, dp(56), 1f));
         }
@@ -269,7 +289,7 @@ final class ControlCenter {
         place(media, 1, 0, 2, 2);
 
         // Độ sáng + âm lượng
-        bright = new VSlider(a, "☀", 0xFFFF6A00, 0xFFFFD000, 255);
+        bright = new VSlider(a, R.drawable.ic_brightness_auto, 0xFFFF6A00, 0xFFFFD000, 255);
         bright.setListener((v, user) -> {
             if (!user) return;
             if (!Settings.System.canWrite(a)) { askWrite(); return; }
@@ -281,14 +301,14 @@ final class ControlCenter {
         });
         place(bright, 1, 2, 2, 1);
 
-        volume = new VSlider(a, "🔊", 0xFF2F6BFF, CYAN, audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
+        volume = new VSlider(a, R.drawable.ic_volume, 0xFF2F6BFF, CYAN, audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
         volume.setListener((v, user) -> {
             if (user) audio.setStreamVolume(AudioManager.STREAM_MUSIC, v, 0);
         });
         place(volume, 1, 3, 2, 1);
 
         // Hàng 3: Bluetooth, máy bay, điểm phát sóng, khóa xoay
-        Tile bt = tile("🔷", "Bluetooth", "", false);
+        Tile bt = tile(R.drawable.ic_bluetooth, "Bluetooth", "", false);
         bind(bt, () -> {
             try {
                 BluetoothAdapter ad = BluetoothAdapter.getDefaultAdapter();
@@ -304,16 +324,16 @@ final class ControlCenter {
         });
         place(bt.root, 3, 0, 1, 1);
 
-        Tile air = tile("✈", "Máy bay", "", false);
+        Tile air = tile(R.drawable.ic_airplane, "Máy bay", "", false);
         bind(air, () -> Settings.Global.getInt(a.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 0) == 1,
                 () -> viaQs(Settings.ACTION_AIRPLANE_MODE_SETTINGS, "chế độ máy bay", "máy bay", "airplane", "flight mode"));
         place(air.root, 3, 1, 1, 1);
 
-        Tile hot = tile("◉", "Phát Wi-Fi", "", false);
+        Tile hot = tile(R.drawable.ic_hotspot, "Phát Wi-Fi", "", false);
         bind(hot, null, () -> viaQs(Settings.ACTION_WIRELESS_SETTINGS, "điểm phát sóng", "phát wi-fi", "điểm phát wi-fi", "hotspot", "điểm truy cập"));
         place(hot.root, 3, 2, 1, 1);
 
-        Tile rot = tile("🔒", "Khóa xoay", "", false);
+        Tile rot = tile(R.drawable.ic_rotate_lock, "Khóa xoay", "", false);
         bind(rot, () -> Settings.System.getInt(a.getContentResolver(), Settings.System.ACCELEROMETER_ROTATION, 1) == 0, () -> {
             if (!Settings.System.canWrite(a)) { askedWrite = false; askWrite(); return; }
             int cur = Settings.System.getInt(a.getContentResolver(), Settings.System.ACCELEROMETER_ROTATION, 1);
@@ -323,7 +343,7 @@ final class ControlCenter {
         place(rot.root, 3, 3, 1, 1);
 
         // Hàng 4: chụp màn hình, chế độ tối, tiết kiệm pin, đèn pin
-        Tile shot = tile("✂", "Chụp màn hình", "", false);
+        Tile shot = tile(R.drawable.ic_screenshot, "Chụp màn hình", "", false);
         bind(shot, null, () -> {
             if (ScreenshotService.instance != null) {
                 closer.run();
@@ -338,16 +358,16 @@ final class ControlCenter {
         });
         place(shot.root, 4, 0, 1, 1);
 
-        Tile dark = tile("🌓", "Chế độ tối", "", false);
+        Tile dark = tile(R.drawable.ic_dark, "Chế độ tối", "", false);
         bind(dark, () -> (a.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
                 == Configuration.UI_MODE_NIGHT_YES, () -> viaQs(Settings.ACTION_DISPLAY_SETTINGS, "chế độ tối", "giao diện tối", "dark mode", "dark"));
         place(dark.root, 4, 1, 1, 1);
 
-        Tile saver = tile("🔋", "Tiết kiệm pin", "", false);
+        Tile saver = tile(R.drawable.ic_battery, "Tiết kiệm pin", "", false);
         bind(saver, () -> power.isPowerSaveMode(), () -> viaQs(Settings.ACTION_BATTERY_SAVER_SETTINGS, "tiết kiệm pin", "tiết kiệm điện", "battery saver", "power saving"));
         place(saver.root, 4, 2, 1, 1);
 
-        Tile torch = tile("🔦", "Đèn pin", "", false);
+        Tile torch = tile(R.drawable.ic_flashlight, "Đèn pin", "", false);
         bind(torch, () -> torchOn, () -> {
             if (torchId == null) {
                 Toast.makeText(a, "Máy không có đèn flash", Toast.LENGTH_SHORT).show();
@@ -358,11 +378,11 @@ final class ControlCenter {
         place(torch.root, 4, 3, 1, 1);
 
         // Hàng 5: vị trí, bảo vệ mắt
-        Tile pos = tile("📍", "Vị trí", "", false);
+        Tile pos = tile(R.drawable.ic_location, "Vị trí", "", false);
         bind(pos, this::locationOn, () -> viaQs(Settings.ACTION_LOCATION_SOURCE_SETTINGS, "vị trí", "định vị", "location", "gps"));
         place(pos.root, 5, 0, 1, 1);
 
-        Tile eye = tile("👁", "Bảo vệ mắt", "", false);
+        Tile eye = tile(R.drawable.ic_eye, "Bảo vệ mắt", "", false);
         bind(eye, null, () -> viaQs(Settings.ACTION_DISPLAY_SETTINGS, "bảo vệ mắt", "eye comfort", "eye protection", "chế độ đọc"));
         place(eye.root, 5, 1, 1, 1);
 
@@ -397,6 +417,7 @@ final class ControlCenter {
             try { r.run(); } catch (Exception ignored) { }
         }
         try {
+            volume.setIcon(headsetOn() ? R.drawable.ic_headphones : R.drawable.ic_volume);
             volume.setMax(audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
             volume.setValue(audio.getStreamVolume(AudioManager.STREAM_MUSIC));
             bright.setValue(Settings.System.getInt(a.getContentResolver(), Settings.System.SCREEN_BRIGHTNESS, 128));
