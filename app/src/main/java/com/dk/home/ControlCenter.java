@@ -37,7 +37,6 @@ import android.graphics.PorterDuff;
 import android.graphics.drawable.GradientDrawable;
 import android.widget.ImageView;
 import android.widget.GridLayout;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
