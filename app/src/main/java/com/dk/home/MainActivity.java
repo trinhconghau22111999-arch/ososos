@@ -60,7 +60,7 @@ public class MainActivity extends Activity {
     private TextView battery;
     private GridLayout grid;
     private ScrollView scroll;
-    private View ccPanel, ccHeader, homeRoot, ytPanel, ytHeader;
+    private View ccPanel, ccHeader, homeRoot, ytPanel;
     private ControlCenter cc;
     private WebView yt;
     private View customView;
@@ -92,8 +92,6 @@ public class MainActivity extends Activity {
         ccHeader = findViewById(R.id.ccHeader);
         homeRoot = findViewById(R.id.homeRoot);
         ytPanel = findViewById(R.id.ytPanel);
-        ytHeader = findViewById(R.id.ytHeader);
-        findViewById(R.id.ytClose).setOnClickListener(v -> animateTo(0f));
         buildYoutube();
         touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
 
@@ -298,7 +296,7 @@ public class MainActivity extends Activity {
     /**
      * Vuốt từ trái sang phải: hiện trung tâm điều khiển (bên trái).
      * Vuốt từ phải sang trái: hiện YouTube (bên phải).
-     * Đóng YouTube: vuốt trái sang phải ở thanh tiêu đề hoặc sát mép trái, hoặc bấm "ĐÓNG".
+     * Đóng YouTube: vuốt trái sang phải bắt đầu từ sát mép trái, hoặc bấm Back.
      */
     @Override
     public boolean dispatchTouchEvent(MotionEvent e) {
@@ -314,7 +312,7 @@ public class MainActivity extends Activity {
                 if (customView != null) tracking = false;
                 else if (pos == 0f) tracking = !search.hasFocus();
                 else if (pos > 0f) tracking = true;
-                else tracking = downX < dp(36) || hit(ytHeader, downY);
+                else tracking = downX < dp(40);
                 break;
             case MotionEvent.ACTION_MOVE:
                 if (tracking && !dragging) {
