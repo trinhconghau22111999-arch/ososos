@@ -128,3 +128,26 @@ internal val YT_AD_JS = """
  setInterval(tick,250);
 })();
 """
+
+// Gắn mọi nút "Tìm kiếm bằng giọng nói" trên trang (YouTube, Google...) sang AndroidVoice. Dò theo aria-label/title
+// thay vì class CSS vì nhãn hỗ trợ tiếp cận ít khi đổi giữa các bản cập nhật giao diện. (Học từ repo Y-utubecuatoi.)
+const val VOICE_HOOK_JS = """
+(function(){
+ if(window.__dmVoiceHook)return; window.__dmVoiceHook=true;
+ var L=['tìm kiếm bằng giọng nói','tim kiem bang giong noi','search by voice','voice search','search with your voice'];
+ function txt(el){return ((el.getAttribute('aria-label')||'')+' '+(el.getAttribute('title')||'')).toLowerCase();}
+ function has(t){for(var i=0;i<L.length;i++){if(t.indexOf(L[i])!==-1)return true;}return false;}
+ function hook(){
+  Array.prototype.forEach.call(document.querySelectorAll('button,[role="button"],a,div[aria-label],span[aria-label]'),function(el){
+   if(el.__dmVoice)return;
+   if(!has(txt(el)))return;
+   el.__dmVoice=true;
+   el.addEventListener('click',function(ev){
+    if(window.AndroidVoice){ev.preventDefault();ev.stopPropagation();window.AndroidVoice.startVoiceSearch();}
+   },true);
+  });
+ }
+ hook(); setInterval(hook,1000);
+ try{new MutationObserver(hook).observe(document.documentElement,{childList:true,subtree:true});}catch(e){}
+})();
+"""

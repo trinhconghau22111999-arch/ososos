@@ -924,7 +924,6 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
             // Tien trinh hien thi bi he thong giet (het RAM / trang qua nang): neu khong xu ly thi ca app bi van.
             override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
                 val v = view ?: return true
-                android.util.Log.e("Webandr", "WebView mất tiến trình hiển thị (didCrash=" + (detail?.didCrash()) + ")", RuntimeException(tab.url))
                 runOnUiThread { recoverCrashedWebView(tab, v) }
                 return true
             }
@@ -1007,7 +1006,6 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
                 customCallback = callback
                 view.setBackgroundColor(Color.BLACK)
                 rootFrame.addView(view, FrameLayout.LayoutParams(MATCH, MATCH))
-                LockService.setVideoFull(true)
             }
 
             override fun onHideCustomView() {
@@ -1051,7 +1049,6 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
         val v = customView ?: return
         rootFrame.removeView(v)
         customView = null
-        LockService.setVideoFull(false)
         customCallback?.onCustomViewHidden()
         customCallback = null
     }
