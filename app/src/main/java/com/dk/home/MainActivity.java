@@ -52,6 +52,14 @@ import android.webkit.WebViewClient;
 import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.ByteArrayInputStream;
+import android.speech.RecognizerIntent;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
+import android.content.ActivityNotFoundException;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
 import android.widget.FrameLayout;
 import android.widget.EditText;
 import android.widget.GridLayout;
@@ -85,6 +93,10 @@ public class MainActivity extends Activity {
     private View ccPanel, ccHeader, homeRoot, ytPanel;
     private ControlCenter cc;
     private WebView yt;
+    /** Domain quảng cáo bị chặn ở tầng mạng cho trang YouTube (đọc từ assets/blocklist.txt). */
+    private final Set<String> ytBlockedHosts = new HashSet<>();
+    /** Mã xin quyền / nhận kết quả giọng nói cho nút micro của YouTube. */
+    private static final int REQ_YT_VOICE = 7401, REQ_YT_MIC = 7402;
     private View tvPanel;
     private TvPage tv;
     private boolean tvActive;
@@ -244,6 +256,11 @@ public class MainActivity extends Activity {
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (requestCode == REQ_YT_MIC) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) startYtVoice();
+            else Toast.makeText(this, "Cần cấp quyền micro để tìm kiếm bằng giọng nói", Toast.LENGTH_SHORT).show();
+            return;
+        }
         if (ai != null && ai.onPermissionResult(requestCode, grantResults)) return;
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
@@ -313,6 +330,14 @@ public class MainActivity extends Activity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == RemotePage.REQ_VOICE) {
             if (rc != null) rc.onVoiceResult(resultCode, data);
+        } else if (requestCode == REQ_YT_VOICE) {
+            if (resultCode == RESULT_OK && data != null) {
+                ArrayList<String> results = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                String spoken = (results == null || results.isEmpty()) ? null : results.get(0);
+                if (spoken != null && !spoken.trim().isEmpty() && yt != null) {
+                    yt.loadUrl("https://m.youtube.com/results?search_query=" + Uri.encode(spoken.trim()));
+                }
+            }
         } else if (requestCode == REQ_QSB_BIND) {
             if (resultCode == RESULT_OK && qsbId >= 0) afterQsbBound(qsbId);
             else dropQsb();
@@ -474,8 +499,22 @@ public class MainActivity extends Activity {
         ws.setLoadWithOverviewMode(true);
         CookieManager.getInstance().setAcceptCookie(true);
         yt.setBackgroundColor(0xFF0D1224);
+        loadYtBlocklist();
         yt.addJavascriptInterface(new AdBridge(), "HauOsAd");
+        yt.addJavascriptInterface(new YtVoiceBridge(), "HauOsVoice");
         yt.setWebViewClient(new WebViewClient() {
+            // Chặn quảng cáo ngay ở tầng mạng: request tới domain trong blocklist không bao giờ được tải.
+            // Trả 404 (không phải 200 rỗng) để trình phát không bị treo chờ phản hồi quảng cáo.
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest request) {
+                if (isYtHostBlocked(request.getUrl().getHost())) {
+                    return new WebResourceResponse("text/plain", "utf-8", 404, "Blocked",
+                            Collections.<String, String>emptyMap(),
+                            new ByteArrayInputStream(new byte[0]));
+                }
+                return super.shouldInterceptRequest(v, request);
+            }
+
             @Override
             public void onPageStarted(WebView v, String url, android.graphics.Bitmap icon) {
                 injectTheme(v);
@@ -526,6 +565,49 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** Đọc assets/blocklist.txt (bỏ dòng trống và dòng chú thích bắt đầu bằng #). */
+    private void loadYtBlocklist() {
+        for (String line : readAsset("blocklist.txt").split("\n")) {
+            String t = line.trim().toLowerCase();
+            if (!t.isEmpty() && !t.startsWith("#")) ytBlockedHosts.add(t);
+        }
+    }
+
+    /** Host có thuộc blocklist không (khớp đúng domain hoặc mọi subdomain của nó). */
+    private boolean isYtHostBlocked(String host) {
+        if (host == null) return false;
+        String h = host.toLowerCase();
+        for (String blocked : ytBlockedHosts) {
+            if (h.equals(blocked) || h.endsWith("." + blocked)) return true;
+        }
+        return false;
+    }
+
+    /** Micro của YouTube: JS bắt cú bấm (assets/yt_voice.js) rồi gọi vào đây. */
+    private class YtVoiceBridge {
+        @JavascriptInterface
+        public void startVoiceSearch() {
+            runOnUiThread(MainActivity.this::startYtVoice);
+        }
+    }
+
+    /** Mở nhận dạng giọng nói gốc của Android (WebView không chạy được Web Speech API). */
+    private void startYtVoice() {
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, REQ_YT_MIC);
+            return;
+        }
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
+        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Nói để tìm kiếm trên YouTube");
+        try {
+            startActivityForResult(intent, REQ_YT_VOICE);
+        } catch (ActivityNotFoundException e) {
+            Toast.makeText(this, "Thiết bị này không hỗ trợ nhận dạng giọng nói", Toast.LENGTH_SHORT).show();
+        }
+    }
+
     /** Cầu nối JS -> app: trang báo toạ độ nút "Bỏ qua quảng cáo", app gửi cú chạm thật vào đó. */
     private class AdBridge {
         @JavascriptInterface
@@ -558,7 +640,8 @@ public class MainActivity extends Activity {
                 String line;
                 while ((line = r.readLine()) != null) sb.append(line).append('\n');
                 r.close();
-                themeJs = readAsset("yt_adskip.js") + "\n(function(){var id='hauos-theme',s=document.getElementById(id);"
+                themeJs = readAsset("yt_adskip.js") + readAsset("yt_adblock.js") + readAsset("yt_voice.js")
+                        + "\n(function(){var id='hauos-theme',s=document.getElementById(id);"
                         + "if(!s){s=document.createElement('style');s.id=id;(document.head||document.documentElement).appendChild(s);}"
                         + "s.textContent=" + JSONObject.quote(sb.toString()) + ";})();";
             }
