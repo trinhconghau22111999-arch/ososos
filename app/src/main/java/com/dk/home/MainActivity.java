@@ -96,7 +96,7 @@ public class MainActivity extends Activity {
     private ValueAnimator anim;
     private VelocityTracker vt;
     private ScaleGestureDetector scale;
-    private int cols = 4;
+    private int cols = 1;
     private float cumScale = 1f;
     private boolean pinching, pinchJustStarted;
     private boolean scaleStepDone;   // mỗi cử chỉ chụm/mở chỉ đổi số cột 1 bậc
@@ -115,7 +115,7 @@ public class MainActivity extends Activity {
         battery = findViewById(R.id.battery);
         grid = findViewById(R.id.appsGrid);
         scroll = findViewById(R.id.homeScroll);
-        cols = Math.max(1, Math.min(4, getSharedPreferences(PREFS, MODE_PRIVATE).getInt("cols", 4)));
+        cols = Math.max(1, Math.min(4, getSharedPreferences(PREFS, MODE_PRIVATE).getInt("cols", 1)));
         grid.setColumnCount(cols);
         scale = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
             @Override
