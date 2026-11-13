@@ -98,7 +98,6 @@ public class MainActivity extends Activity {
         touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
 
         findViewById(R.id.clockPanel).setBackground(Ui.panel(this, Ui.GRID));
-        findViewById(R.id.ctlBtn).setBackground(Ui.panel(this, Ui.ACCENT));
         search.setBackground(Ui.panel(this, Ui.PLAIN));
         battery.setBackground(Ui.panel(this, Ui.HOT, 8));
 
@@ -106,7 +105,6 @@ public class MainActivity extends Activity {
 
         cc = new ControlCenter(this, (GridLayout) findViewById(R.id.ccGrid),
                 (TextView) findViewById(R.id.ccInfo), this::closeCc);
-        findViewById(R.id.ctlBtn).setOnClickListener(v -> openCc());
         findViewById(R.id.ccSettings).setOnClickListener(v -> go(new Intent(Settings.ACTION_SETTINGS)));
 
         setPos(0f);

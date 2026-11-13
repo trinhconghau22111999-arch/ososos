@@ -110,20 +110,6 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <TextView
-                    android:id="@+id/ctlBtn"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:fontFamily="sans-serif-condensed"
-                    android:gravity="center"
-                    android:letterSpacing="0.14"
-                    android:padding="13dp"
-                    android:text="▶  TRUNG TÂM ĐIỀU KHIỂN"
-                    android:textColor="#00E5FF"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
                 <EditText
                     android:id="@+id/search"
                     android:layout_width="match_parent"
