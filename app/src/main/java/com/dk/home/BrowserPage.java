@@ -31,7 +31,17 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
+import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.ScrollView;
+import android.content.res.ColorStateList;
+import android.graphics.drawable.ColorDrawable;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+import java.util.function.Consumer;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
@@ -65,6 +75,18 @@ final class BrowserPage extends LinearLayout {
         String title, url;
     }
 
+    private static final class Hist {
+        String title, url;
+        long at;
+    }
+
+    private static final int MAX_HIST = 300, MAX_SEARCH = 100;
+    private final List<Hist> hist = new ArrayList<>();
+    private final List<String> searches = new ArrayList<>();
+    /** Bật: chạm vào liên kết thì tự mở tab mới. Tắt: mở ngay trong tab hiện tại, chỉ nhấn giữ mới mở tab khác. */
+    private boolean newTabOnTap = true;
+    private ArrayAdapter<String> suggestAd;
+
     private final MainActivity act;
     private final List<Tab> tabs = new ArrayList<>();
     private final List<Mark> marks = new ArrayList<>();
@@ -72,7 +94,7 @@ final class BrowserPage extends LinearLayout {
 
     private final HorizontalScrollView tabScroll;
     private final LinearLayout tabRow;
-    private final EditText urlBox;
+    private final AutoCompleteTextView urlBox;
     private final Icon starBtn;
     private final View progress;
     private final FrameLayout holder;
@@ -93,7 +115,17 @@ final class BrowserPage extends LinearLayout {
         tabRow.setOrientation(HORIZONTAL);
         tabRow.setPadding(dp(8), dp(4), dp(8), dp(4));
         tabScroll.addView(tabRow, new FrameLayout.LayoutParams(-2, -1));   // cao bằng thanh tab, tab không bị cắt/lệch lên trên
-        addView(tabScroll, new LayoutParams(-1, dp(36)));
+        LinearLayout tabBar = new LinearLayout(a);
+        tabBar.setOrientation(HORIZONTAL);
+        TextView gear = new TextView(a);
+        gear.setText("⚙");
+        gear.setTextColor(TXT_ON);
+        gear.setTextSize(20);
+        gear.setGravity(Gravity.CENTER);
+        gear.setOnClickListener(v -> showSettings());
+        tabBar.addView(gear, new LayoutParams(dp(34), -1));
+        tabBar.addView(tabScroll, new LayoutParams(0, -1, 1f));
+        addView(tabBar, new LayoutParams(-1, dp(36)));
 
         // --- hàng ô địa chỉ ---
         LinearLayout bar = new LinearLayout(a);
@@ -101,7 +133,7 @@ final class BrowserPage extends LinearLayout {
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setPadding(dp(8), 0, dp(4), dp(8));
 
-        urlBox = new EditText(a);
+        urlBox = new AutoCompleteTextView(a);
         urlBox.setSingleLine(true);
         urlBox.setTextColor(Color.WHITE);
         urlBox.setHintTextColor(Ui.DIM);
@@ -123,6 +155,21 @@ final class BrowserPage extends LinearLayout {
             }
             return false;
         });
+        urlBox.setThreshold(1);
+        urlBox.setDropDownBackgroundDrawable(new ColorDrawable(0xFF1E1E1E));
+        suggestAd = new ArrayAdapter<String>(a, android.R.layout.simple_dropdown_item_1line, new ArrayList<String>()) {
+            @Override
+            public View getView(int position, View cv, ViewGroup parent) {
+                TextView tv = (TextView) super.getView(position, cv, parent);
+                tv.setTextColor(Color.WHITE);
+                tv.setTextSize(15);
+                tv.setSingleLine(true);
+                return tv;
+            }
+        };
+        urlBox.setAdapter(suggestAd);
+        urlBox.setOnItemClickListener((pa, vw, pos, id) -> go());
+        urlBox.setOnFocusChangeListener((vw, has) -> { if (has) refreshSuggest(); });
         bar.addView(urlBox, new LayoutParams(0, dp(44), 1f));
 
         Icon search = new Icon(a, Icon.SEARCH, Color.WHITE);
@@ -338,7 +385,19 @@ final class BrowserPage extends LinearLayout {
         w.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, android.webkit.WebResourceRequest r) {
-                return handleScheme(r.getUrl().toString());
+                String u = r.getUrl().toString();
+                String low = u.toLowerCase();
+                if (newTabOnTap && r.isForMainFrame() && r.hasGesture() && !r.isRedirect()
+                        && (low.startsWith("http://") || low.startsWith("https://"))
+                        && tabs.size() < MAX_TABS) {
+                    WebView.HitTestResult h = v.getHitTestResult();
+                    int ty = h == null ? 0 : h.getType();
+                    if (ty == WebView.HitTestResult.SRC_ANCHOR_TYPE || ty == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE) {
+                        newTab(u, true);   // chạm vào liên kết: mở tab mới
+                        return true;
+                    }
+                }
+                return handleScheme(u);
             }
 
             @Override
@@ -356,6 +415,8 @@ final class BrowserPage extends LinearLayout {
             public void onPageFinished(WebView v, String url) {
                 t.url = url;
                 if (v.getTitle() != null) t.title = v.getTitle();
+                addHistory(v.getTitle(), url);
+                noteSearch(url);
                 if (t == current()) {
                     if (!urlBox.hasFocus()) urlBox.setText(url);
                     progress.setVisibility(INVISIBLE);
@@ -382,6 +443,34 @@ final class BrowserPage extends LinearLayout {
 
             @Override
             public boolean onCreateWindow(WebView v, boolean dialog, boolean userGesture, Message msg) {
+                if (!newTabOnTap) {
+                    // Tắt "tự mở tab mới": liên kết _blank / window.open cũng mở ngay trong tab hiện tại
+                    if (!userGesture) return false;
+                    WebView tmp = new WebView(act);
+                    final boolean[] done = {false};
+                    tmp.setWebViewClient(new WebViewClient() {
+                        private void here(WebView x, String u) {
+                            if (done[0]) return;
+                            done[0] = true;
+                            if (t.web != null && u != null && !u.isEmpty() && !u.equals("about:blank")) t.web.loadUrl(u);
+                            x.post(x::destroy);
+                        }
+
+                        @Override
+                        public boolean shouldOverrideUrlLoading(WebView x, android.webkit.WebResourceRequest rq) {
+                            here(x, rq.getUrl().toString());
+                            return true;
+                        }
+
+                        @Override
+                        public void onPageStarted(WebView x, String u, Bitmap ic) {
+                            here(x, u);
+                        }
+                    });
+                    ((WebView.WebViewTransport) msg.obj).setWebView(tmp);
+                    msg.sendToTarget();
+                    return true;
+                }
                 if (tabs.size() >= MAX_TABS) return false;
                 Tab n = newTab("", true);
                 WebView.WebViewTransport tr = (WebView.WebViewTransport) msg.obj;
@@ -539,6 +628,7 @@ final class BrowserPage extends LinearLayout {
         if (q.matches("^[a-zA-Z][a-zA-Z0-9+.-]*://.*")) url = q;
         else if (!q.contains(" ") && (q.contains(".") || q.startsWith("localhost")) ) url = "https://" + q;
         else url = "https://www.google.com/search?q=" + Uri.encode(q);
+        if (url.startsWith("https://www.google.com/search?q=")) addSearch(q);
         hideKeyboard();
         urlBox.clearFocus();
         Tab t = current();
@@ -548,6 +638,179 @@ final class BrowserPage extends LinearLayout {
             holder.addView(t.web, new FrameLayout.LayoutParams(-1, -1));
         }
         t.web.loadUrl(url);
+    }
+
+    // ---------- lịch sử + cài đặt ----------
+
+    private void addSearch(String q) {
+        if (q == null) return;
+        q = q.trim();
+        if (q.isEmpty()) return;
+        searches.remove(q);
+        searches.add(0, q);
+        while (searches.size() > MAX_SEARCH) searches.remove(searches.size() - 1);
+    }
+
+    /** Trang kết quả tìm kiếm (Google/Bing/DuckDuckGo/YouTube): ghi lại từ khóa dù gõ ở ô địa chỉ hay ngay trong trang. */
+    private void noteSearch(String url) {
+        try {
+            Uri u = Uri.parse(url);
+            String h = u.getHost() == null ? "" : u.getHost();
+            String path = u.getPath() == null ? "" : u.getPath();
+            String q = null;
+            if (h.contains("google.") && path.equals("/search")) q = u.getQueryParameter("q");
+            else if (h.contains("bing.com") && path.equals("/search")) q = u.getQueryParameter("q");
+            else if (h.contains("duckduckgo.com")) q = u.getQueryParameter("q");
+            else if (h.contains("youtube.com") && path.equals("/results")) q = u.getQueryParameter("search_query");
+            if (q != null) addSearch(q);
+        } catch (Exception ignored) { }
+    }
+
+    private void addHistory(String title, String url) {
+        if (url == null) return;
+        String low = url.toLowerCase();
+        if (!(low.startsWith("http://") || low.startsWith("https://"))) return;
+        if (!hist.isEmpty() && hist.get(0).url.equals(url)) {
+            if (title != null && !title.isEmpty()) hist.get(0).title = title;
+            return;
+        }
+        Hist e = new Hist();
+        e.url = url;
+        e.title = title == null || title.isEmpty() ? hostOf(url) : title;
+        e.at = System.currentTimeMillis();
+        hist.add(0, e);
+        while (hist.size() > MAX_HIST) hist.remove(hist.size() - 1);
+    }
+
+    /** Gợi ý khi gõ ở ô địa chỉ: từ khóa đã tìm + địa chỉ trang đã vào (bỏ https://). */
+    private void refreshSuggest() {
+        suggestAd.clear();
+        for (String q : searches) suggestAd.add(q);
+        java.util.HashSet<String> seen = new java.util.HashSet<>();
+        for (Hist h : hist) {
+            String u = h.url.replaceFirst("^https?://(www\\.)?", "");
+            if (u.endsWith("/")) u = u.substring(0, u.length() - 1);
+            if (seen.add(u)) suggestAd.add(u);
+            if (seen.size() >= 100) break;
+        }
+        suggestAd.notifyDataSetChanged();
+    }
+
+    private void showSettings() {
+        hideKeyboard();
+        LinearLayout box = new LinearLayout(act);
+        box.setOrientation(VERTICAL);
+        box.setPadding(dp(16), dp(16), dp(16), dp(10));
+        TextView title = new TextView(act);
+        title.setText("CÀI ĐẶT TRÌNH DUYỆT");
+        title.setTextColor(Ui.CYAN);
+        title.setTextSize(16);
+        title.setPadding(0, 0, 0, dp(8));
+        Ui.style(title);
+        box.addView(title);
+        final AlertDialog d = new AlertDialog.Builder(act).setView(box).create();
+        if (d.getWindow() != null) d.getWindow().setBackgroundDrawable(Ui.panel(act, Ui.GRID));
+        CheckBox cb = new CheckBox(act);
+        cb.setText("Chạm vào liên kết thì tự mở tab mới");
+        cb.setTextColor(Color.WHITE);
+        cb.setTextSize(14);
+        cb.setButtonTintList(ColorStateList.valueOf(Ui.CYAN));
+        cb.setChecked(newTabOnTap);
+        cb.setOnCheckedChangeListener((b, on) -> { newTabOnTap = on; save(); });
+        box.addView(cb);
+        TextView note = new TextView(act);
+        note.setText("Bỏ chọn: chạm vào liên kết sẽ mở ngay trong tab hiện tại. Muốn mở tab khác thì nhấn giữ liên kết.");
+        note.setTextColor(Ui.DIM);
+        note.setTextSize(12);
+        note.setPadding(dp(4), dp(2), dp(4), dp(8));
+        box.addView(note);
+        box.addView(menuRow("Lịch sử trang", () -> { d.dismiss(); showHistory(); }));
+        box.addView(menuRow("Lịch sử tìm kiếm", () -> { d.dismiss(); showSearches(); }));
+        box.addView(menuRow("Xóa toàn bộ lịch sử", () -> {
+            hist.clear();
+            searches.clear();
+            save();
+            d.dismiss();
+            Toast.makeText(act, "Đã xóa lịch sử", Toast.LENGTH_SHORT).show();
+        }));
+        d.show();
+    }
+
+    private void showHistory() {
+        final SimpleDateFormat f = new SimpleDateFormat("dd/MM HH:mm", Locale.getDefault());
+        List<String[]> rows = new ArrayList<>();
+        for (Hist h : hist) rows.add(new String[]{h.title, h.url, f.format(new Date(h.at))});
+        showList("LỊCH SỬ TRANG", rows, "Chưa có lịch sử trang.", i -> open(hist.get(i).url), i -> hist.remove(i));
+    }
+
+    private void showSearches() {
+        List<String[]> rows = new ArrayList<>();
+        for (String q : searches) rows.add(new String[]{q, "", ""});
+        showList("LỊCH SỬ TÌM KIẾM", rows, "Chưa có lịch sử tìm kiếm.", i -> {
+            urlBox.setText(searches.get(i));
+            go();
+        }, i -> searches.remove(i));
+    }
+
+    /** Danh sách cuộn: bấm để mở, nhấn giữ để xóa một dòng. */
+    private void showList(String head, List<String[]> rows, String empty, final Consumer<Integer> onClick, final Consumer<Integer> onDelete) {
+        LinearLayout box = new LinearLayout(act);
+        box.setOrientation(VERTICAL);
+        box.setPadding(dp(16), dp(16), dp(16), dp(10));
+        TextView title = new TextView(act);
+        title.setText(head);
+        title.setTextColor(Ui.CYAN);
+        title.setTextSize(16);
+        title.setPadding(0, 0, 0, dp(6));
+        Ui.style(title);
+        box.addView(title);
+        final AlertDialog d = new AlertDialog.Builder(act).setView(box).create();
+        if (d.getWindow() != null) d.getWindow().setBackgroundDrawable(Ui.panel(act, Ui.GRID));
+        if (rows.isEmpty()) {
+            TextView e = new TextView(act);
+            e.setText(empty);
+            e.setTextColor(Ui.DIM);
+            e.setTextSize(14);
+            e.setPadding(dp(4), dp(10), dp(4), dp(10));
+            box.addView(e);
+        } else {
+            ScrollView sv = new ScrollView(act);
+            LinearLayout col = new LinearLayout(act);
+            col.setOrientation(VERTICAL);
+            sv.addView(col);
+            for (int i = 0; i < rows.size(); i++) {
+                final int idx = i;
+                String[] r = rows.get(i);
+                TextView row = new TextView(act);
+                String txt = r[0];
+                if (!r[1].isEmpty()) txt += "\n" + r[1];
+                if (!r[2].isEmpty()) txt += "\n" + r[2];
+                row.setText(txt);
+                row.setTextColor(Color.WHITE);
+                row.setTextSize(14);
+                row.setMaxLines(3);
+                row.setEllipsize(TextUtils.TruncateAt.END);
+                row.setPadding(dp(4), dp(10), dp(4), dp(10));
+                row.setOnClickListener(v -> { d.dismiss(); onClick.accept(idx); });
+                row.setOnLongClickListener(v -> {
+                    onDelete.accept(idx);
+                    save();
+                    d.dismiss();
+                    Toast.makeText(act, "Đã xóa", Toast.LENGTH_SHORT).show();
+                    return true;
+                });
+                col.addView(row);
+            }
+            int maxH = (int) (getResources().getDisplayMetrics().heightPixels * 0.6f);
+            box.addView(sv, new LayoutParams(-1, maxH));
+            TextView hint = new TextView(act);
+            hint.setText("Nhấn giữ một dòng để xóa");
+            hint.setTextColor(Ui.DIM);
+            hint.setTextSize(12);
+            hint.setPadding(dp(4), dp(8), dp(4), 0);
+            box.addView(hint);
+        }
+        d.show();
     }
 
     private void hideKeyboard() {
@@ -723,12 +986,17 @@ final class BrowserPage extends LinearLayout {
                 String u = t.web != null && t.web.getUrl() != null ? t.web.getUrl() : t.url;
                 ta.put(new JSONObject().put("u", u == null ? HOME : u).put("t", t.title == null ? "" : t.title));
             }
+            JSONArray ha = new JSONArray();
+            for (Hist h : hist) ha.put(new JSONObject().put("u", h.url).put("t", h.title).put("a", h.at));
             JSONArray ma = new JSONArray();
             for (Mark m : marks) ma.put(new JSONObject().put("u", m.url).put("t", m.title));
             act.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
                     .putString("br_tabs", ta.toString())
                     .putInt("br_cur", cur)
                     .putString("br_marks", ma.toString())
+                    .putString("br_hist", ha.toString())
+                    .putString("br_search", new JSONArray(searches).toString())
+                    .putBoolean("br_newtab", newTabOnTap)
                     .apply();
         } catch (Exception ignored) { }
     }
@@ -745,6 +1013,18 @@ final class BrowserPage extends LinearLayout {
                 tabs.add(t);
             }
             cur = p.getInt("br_cur", 0);
+            newTabOnTap = p.getBoolean("br_newtab", true);
+            JSONArray ha = new JSONArray(p.getString("br_hist", "[]"));
+            for (int i = 0; i < ha.length() && i < MAX_HIST; i++) {
+                JSONObject o = ha.getJSONObject(i);
+                Hist h = new Hist();
+                h.url = o.optString("u", "");
+                h.title = o.optString("t", "");
+                h.at = o.optLong("a", 0L);
+                if (!h.url.isEmpty()) hist.add(h);
+            }
+            JSONArray sa = new JSONArray(p.getString("br_search", "[]"));
+            for (int i = 0; i < sa.length() && i < MAX_SEARCH; i++) searches.add(sa.getString(i));
             JSONArray ma = new JSONArray(p.getString("br_marks", "[]"));
             for (int i = 0; i < ma.length(); i++) {
                 JSONObject o = ma.getJSONObject(i);
