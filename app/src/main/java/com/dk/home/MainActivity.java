@@ -100,6 +100,7 @@ public class MainActivity extends Activity {
     private FrameLayout qsbHolder;
     private int qsbId = -1;
     private BrowserPage br;
+    private AiAssistant ai;
     private boolean brActive;
     private View customView;
     private WebChromeClient.CustomViewCallback customCb;
@@ -176,6 +177,10 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) { }
 
         findViewById(R.id.clockPanel).setBackground(Ui.panel(this, Ui.GRID));
+        ai = new AiAssistant(this);
+        View aiBtn = findViewById(R.id.aiBtn);
+        aiBtn.setBackground(Ui.panel(this, Ui.ACCENT, 8));
+        aiBtn.setOnClickListener(v -> ai.start());
         findViewById(R.id.clock).setOnClickListener(v -> openClockApp());
         findViewById(R.id.date).setOnClickListener(v -> openCalendarApp());
         search.setBackground(Ui.panel(this, Ui.PLAIN));
@@ -238,6 +243,36 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (ai != null && ai.onPermissionResult(requestCode, grantResults)) return;
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+    }
+
+    // ---------- Cho trợ lý AI giọng nói ----------
+
+    /** Chuyển trang: -3 Điều khiển, -2 TV, -1 YouTube, 0 màn hình chính, 1 Tiện ích. */
+    void aiPage(float p) {
+        if (customView != null) hideCustom();
+        resetSearch();
+        animateTo(p);
+    }
+
+    /** Mở YouTube, có từ khóa thì tìm luôn. */
+    void aiYoutube(String q) {
+        if (q != null && !q.trim().isEmpty()) yt.loadUrl("https://m.youtube.com/results?search_query=" + Uri.encode(q.trim()));
+        aiPage(-1f);
+    }
+
+    /** Mở TV, có tên kênh thì phát luôn kênh đó. */
+    void aiTv(final String q) {
+        aiPage(-2f);
+        if (q == null || q.trim().isEmpty()) return;
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            if (!tv.playByName(q)) Toast.makeText(this, "Không thấy kênh \"" + q + "\"", Toast.LENGTH_SHORT).show();
+        }, 450);
+    }
+
+    @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         if (ControlCenter.keepOpen) {
@@ -252,6 +287,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        if (ai != null) ai.cancel();
         if (yt != null) yt.onPause();
         if (tv != null) tv.onAppPause();
         if (rc != null) rc.setActive(false);
@@ -261,6 +297,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (ai != null) ai.cancel();
         if (yt != null) {
             ((ViewGroup) yt.getParent()).removeView(yt);
             yt.destroy();
@@ -674,7 +711,7 @@ public class MainActivity extends Activity {
 
     // ---------- Màn hình chính ----------
 
-    private void go(Intent i) {
+    void go(Intent i) {
         try {
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(i);
@@ -684,7 +721,7 @@ public class MainActivity extends Activity {
     }
 
     /** Thử lần lượt các cách mở; cách nào mở được thì dừng. */
-    private boolean launchFirst(List<Intent> tries) {
+    boolean launchFirst(List<Intent> tries) {
         for (Intent i : tries) {
             if (i == null) continue;
             try {
@@ -701,7 +738,7 @@ public class MainActivity extends Activity {
     }
 
     /** Chạm vào giờ: mở ứng dụng Đồng hồ có sẵn trên máy. */
-    private void openClockApp() {
+    void openClockApp() {
         List<Intent> t = new ArrayList<>();
         t.add(new Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS));
         addPkgs(t, "com.google.android.deskclock", "com.android.deskclock", "com.sec.android.app.clockpackage",
@@ -711,7 +748,7 @@ public class MainActivity extends Activity {
     }
 
     /** Chạm vào thứ, ngày, tháng: mở ứng dụng Lịch có sẵn trên máy. */
-    private void openCalendarApp() {
+    void openCalendarApp() {
         List<Intent> t = new ArrayList<>();
         t.add(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALENDAR));
         t.add(new Intent(Intent.ACTION_VIEW, android.content.ContentUris.withAppendedId(

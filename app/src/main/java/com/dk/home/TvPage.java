@@ -757,6 +757,31 @@ public class TvPage extends FrameLayout {
         if (cur != null) load(cur.url);
     }
 
+    private static String normName(String t) {
+        String n = java.text.Normalizer.normalize(t == null ? "" : t, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{Mn}+", "").replace('đ', 'd').replace('Đ', 'D').toLowerCase(java.util.Locale.ROOT);
+        return n.replaceAll("[^a-z0-9]+", "");
+    }
+
+    /** Trợ lý AI: phát kênh có tên khớp nhất với câu nói. Trả về false nếu không thấy. */
+    public boolean playByName(String name) {
+        String q = normName(name).replace("kenh", "").replace("dai", "");
+        if (q.length() < 2) return false;
+        Ch best = null;
+        int bestScore = 0, bestDiff = Integer.MAX_VALUE;
+        for (Ch c : all) {
+            String n = normName(c.name);
+            int score = n.equals(q) ? 3 : (n.contains(q) || q.contains(n)) && n.length() >= 2 ? 2 : 0;
+            int diff = Math.abs(n.length() - q.length());
+            if (score > bestScore || (score == bestScore && score > 0 && diff < bestDiff)) {
+                best = c; bestScore = score; bestDiff = diff;
+            }
+        }
+        if (best == null) return false;
+        play(best);
+        return true;
+    }
+
     private void play(Ch c) {
         ui.removeCallbacks(zapRun);
         ui.removeCallbacks(retryRun);

@@ -74,11 +74,15 @@
                     android:layout_marginTop="10dp"
                     android:background="@drawable/bg_rule" />
 
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp">
+
                 <LinearLayout
                     android:id="@+id/clockPanel"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
                     android:orientation="vertical"
                     android:paddingBottom="16dp"
                     android:paddingLeft="22dp"
@@ -110,6 +114,24 @@
                         android:textSize="14sp"
                         android:textStyle="bold" />
                 </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/aiBtn"
+                        android:layout_width="56dp"
+                        android:layout_height="52dp"
+                        android:layout_gravity="top|end"
+                        android:layout_marginEnd="6dp"
+                        android:layout_marginTop="6dp"
+                        android:clickable="true"
+                        android:contentDescription="AI giọng nói"
+                        android:fontFamily="sans-serif-condensed"
+                        android:gravity="center"
+                        android:letterSpacing="0.1"
+                        android:text="AI"
+                        android:textColor="#00E5FF"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+                </FrameLayout>
 
                 <EditText
                     android:id="@+id/search"
