@@ -15,6 +15,8 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.text.TextUtils;
 import android.view.Gravity;
@@ -408,6 +410,36 @@ final class BrowserPage extends LinearLayout {
                 act.hideCustomPublic();
             }
         });
+        // Nhấn giữ liên kết / tiêu đề / ảnh / video: hộp thoại "Mở trong tab mới" (mở nền, vẫn ở trang hiện tại)
+        w.setOnLongClickListener(v -> {
+            final WebView.HitTestResult r = ((WebView) v).getHitTestResult();
+            if (r == null) return false;
+            final String extra = r.getExtra();
+            switch (r.getType()) {
+                case WebView.HitTestResult.SRC_ANCHOR_TYPE:
+                    if (extra == null || extra.isEmpty()) return false;
+                    showOpenInTab(extra, null);
+                    return true;
+                case WebView.HitTestResult.IMAGE_TYPE:
+                    if (extra == null || extra.isEmpty()) return false;
+                    showOpenInTab(null, extra);
+                    return true;
+                case WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE: {
+                    final String img = extra;
+                    Handler h = new Handler(Looper.getMainLooper()) {
+                        @Override
+                        public void handleMessage(Message m) {
+                            String link = m.getData() == null ? null : m.getData().getString("url");
+                            showOpenInTab(link, img);
+                        }
+                    };
+                    ((WebView) v).requestFocusNodeHref(h.obtainMessage());
+                    return true;
+                }
+                default:
+                    return false;
+            }
+        });
         w.setDownloadListener((url, ua, cd, mime, len) -> {
             try {
                 DownloadManager.Request rq = new DownloadManager.Request(Uri.parse(url));
@@ -428,6 +460,57 @@ final class BrowserPage extends LinearLayout {
             }
         });
         return w;
+    }
+
+    /** Hộp thoại sau khi nhấn giữ: bấm để mở trong tab mới ở nền, người dùng vẫn ở trang hiện tại. */
+    private void showOpenInTab(final String link, final String image) {
+        LinearLayout box = new LinearLayout(act);
+        box.setOrientation(VERTICAL);
+        box.setPadding(dp(16), dp(16), dp(16), dp(10));
+        TextView title = new TextView(act);
+        title.setText(link != null && !link.isEmpty() ? link : image);
+        title.setTextColor(Ui.DIM);
+        title.setTextSize(12);
+        title.setMaxLines(2);
+        title.setEllipsize(TextUtils.TruncateAt.END);
+        title.setPadding(0, 0, 0, dp(6));
+        box.addView(title);
+        final AlertDialog d = new AlertDialog.Builder(act).setView(box).create();
+        if (d.getWindow() != null) d.getWindow().setBackgroundDrawable(Ui.panel(act, Ui.GRID));
+        if (link != null && !link.isEmpty()) {
+            box.addView(menuRow("Mở trong tab mới", () -> { d.dismiss(); openBackground(link); }));
+        }
+        if (image != null && !image.isEmpty() && !image.equals(link)) {
+            box.addView(menuRow(link != null && !link.isEmpty() ? "Mở ảnh trong tab mới" : "Mở trong tab mới",
+                    () -> { d.dismiss(); openBackground(image); }));
+        }
+        if (box.getChildCount() < 2) return;
+        d.show();
+    }
+
+    private TextView menuRow(String label, Runnable onClick) {
+        TextView row = new TextView(act);
+        row.setText(Ui.up(label));
+        row.setTextColor(Color.WHITE);
+        row.setTextSize(14);
+        row.setPadding(dp(4), dp(14), dp(4), dp(14));
+        Ui.style(row);
+        row.setOnClickListener(v -> onClick.run());
+        return row;
+    }
+
+    /** Mở một tab mới nhưng không chuyển sang đó. */
+    private void openBackground(String url) {
+        if (tabs.size() >= MAX_TABS) {
+            Toast.makeText(act, "Tối đa " + MAX_TABS + " tab", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Tab t = new Tab();
+        t.url = url;
+        tabs.add(t);
+        rebuildChips();
+        save();
+        Toast.makeText(act, "Đã mở tab mới", Toast.LENGTH_SHORT).show();
     }
 
     /** true nếu đã xử lý (mở app khác); false để WebView tự tải trang http(s). */
