@@ -48,6 +48,9 @@ final class BrowserPage extends LinearLayout {
     private static final String HOME = "https://www.google.com/";
     private static final int MAX_TABS = 20;
     private static final int STAR_BLUE = 0xFF2EB8FF;
+    // Bảng màu giống trình duyệt mẫu: nền đen, tab đang mở xanh đậm chữ xanh sáng, ô địa chỉ xám đậm
+    private static final int BG = 0xFF000000, TAB_ON = 0xFF0B4A73, TAB_OFF = 0xFF1C1C1E;
+    private static final int TXT_ON = 0xFF4DB6FF, TXT_OFF = 0xFF9AA0A6, LINK = 0xFF3EA6FF, URL_BG = 0xFF1E1E1E;
 
     private static final class Tab {
         WebView web;       // tạo khi chọn tab lần đầu
@@ -77,7 +80,7 @@ final class BrowserPage extends LinearLayout {
         super(a);
         act = a;
         setOrientation(VERTICAL);
-        setBackgroundColor(0xFF0B1020);
+        setBackgroundColor(BG);
         setClickable(true);
 
         // --- thanh tab ---
@@ -86,26 +89,29 @@ final class BrowserPage extends LinearLayout {
         tabScroll.setOverScrollMode(OVER_SCROLL_NEVER);
         tabRow = new LinearLayout(a);
         tabRow.setOrientation(HORIZONTAL);
-        tabRow.setPadding(dp(6), dp(6), dp(6), dp(4));
+        tabRow.setPadding(dp(8), dp(6), dp(8), dp(6));
         tabScroll.addView(tabRow, new ViewGroup.LayoutParams(-2, -2));
-        addView(tabScroll, new LayoutParams(-1, dp(46)));
+        addView(tabScroll, new LayoutParams(-1, dp(40)));
 
         // --- hàng ô địa chỉ ---
         LinearLayout bar = new LinearLayout(a);
         bar.setOrientation(HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(6), dp(2), dp(4), dp(6));
+        bar.setPadding(dp(8), dp(4), dp(4), dp(8));
 
         urlBox = new EditText(a);
         urlBox.setSingleLine(true);
         urlBox.setTextColor(Color.WHITE);
         urlBox.setHintTextColor(Ui.DIM);
         urlBox.setHint("Nhập địa chỉ hoặc từ khóa");
-        urlBox.setTextSize(15);
+        urlBox.setTextSize(17);
         urlBox.setSelectAllOnFocus(true);
         urlBox.setImeOptions(EditorInfo.IME_ACTION_GO | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
         urlBox.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI);
-        urlBox.setBackground(Ui.panel(a, Ui.PLAIN, 8));
+        GradientDrawable ub = new GradientDrawable();
+        ub.setColor(URL_BG);
+        ub.setCornerRadius(dp(2));
+        urlBox.setBackground(ub);
         urlBox.setPadding(dp(12), 0, dp(10), 0);
         urlBox.setEllipsize(TextUtils.TruncateAt.END);
         urlBox.setOnEditorActionListener((v, id, ev) -> {
@@ -132,7 +138,7 @@ final class BrowserPage extends LinearLayout {
 
         // --- thanh tiến trình + vùng trang ---
         progress = new View(a);
-        progress.setBackgroundColor(Ui.CYAN);
+        progress.setBackgroundColor(LINK);
         progress.setPivotX(0f);
         progress.setScaleX(0f);
         progress.setVisibility(INVISIBLE);
@@ -234,11 +240,11 @@ final class BrowserPage extends LinearLayout {
             c.setSingleLine(true);
             c.setEllipsize(TextUtils.TruncateAt.END);
             c.setGravity(Gravity.CENTER_VERTICAL);
-            c.setTextSize(14);
-            c.setPadding(dp(12), 0, dp(10), 0);
-            c.setMaxWidth(dp(190));
-            c.setMinWidth(dp(96));
-            c.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+            c.setTextSize(13);
+            c.setPadding(dp(10), 0, dp(4), 0);
+            c.setMaxWidth(dp(130));
+            c.setMinWidth(dp(70));
+            c.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
             c.setOnClickListener(v -> {
                 if (idx != cur) select(idx);
             });
@@ -254,22 +260,22 @@ final class BrowserPage extends LinearLayout {
             cell.addView(c, new LayoutParams(-2, -1));
             TextView x = new TextView(act);
             x.setText("✕");
-            x.setTextSize(13);
+            x.setTextSize(12);
             x.setGravity(Gravity.CENTER);
-            x.setPadding(dp(8), 0, dp(10), 0);
+            x.setPadding(dp(6), 0, dp(10), 0);
             x.setOnClickListener(v -> closeTab(idx));
             cell.addView(x, new LayoutParams(-2, -1));
             cell.setTag(x);
             LayoutParams lp = new LayoutParams(-2, -1);
-            lp.rightMargin = dp(6);
+            lp.rightMargin = dp(4);
             tabRow.addView(cell, lp);
         }
         TextView add = new TextView(act);
         add.setText("+ Tab");
-        add.setTextColor(Ui.CYAN);
+        add.setTextColor(LINK);
         add.setTextSize(14);
         add.setGravity(Gravity.CENTER_VERTICAL);
-        add.setPadding(dp(10), 0, dp(14), 0);
+        add.setPadding(dp(12), 0, dp(10), 0);
         add.setOnClickListener(v -> {
             if (tabs.size() >= MAX_TABS) {
                 Toast.makeText(act, "Tối đa " + MAX_TABS + " tab", Toast.LENGTH_SHORT).show();
@@ -278,24 +284,38 @@ final class BrowserPage extends LinearLayout {
             newTab(HOME, true);
         });
         tabRow.addView(add, new LayoutParams(-2, -1));
+        TextView dl = new TextView(act);
+        dl.setText("↓ Tải xuống");
+        dl.setTextColor(LINK);
+        dl.setTextSize(14);
+        dl.setGravity(Gravity.CENTER_VERTICAL);
+        dl.setPadding(dp(10), 0, dp(14), 0);
+        dl.setOnClickListener(v -> {
+            try {
+                act.startActivity(new Intent(DownloadManager.ACTION_VIEW_DOWNLOADS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            } catch (Exception e) {
+                Toast.makeText(act, "Không mở được mục Tải xuống", Toast.LENGTH_SHORT).show();
+            }
+        });
+        tabRow.addView(dl, new LayoutParams(-2, -1));
         refreshChips();
     }
 
     private void refreshChips() {
-        for (int i = 0; i < tabs.size() && i < tabRow.getChildCount() - 1; i++) {
+        for (int i = 0; i < tabs.size() && i < tabRow.getChildCount() - 2; i++) {
             Tab t = tabs.get(i);
             boolean on = i == cur;
             LinearLayout cell = (LinearLayout) tabRow.getChildAt(i);
             GradientDrawable bg = new GradientDrawable();
-            bg.setColor(on ? 0xFF0B3B5F : 0xFF1A2138);
-            bg.setCornerRadius(dp(4));
+            bg.setColor(on ? TAB_ON : TAB_OFF);
+            bg.setCornerRadius(dp(3));
             cell.setBackground(bg);
             String title = t.title == null || t.title.isEmpty()
                     ? (t.web != null && t.web.getTitle() != null ? t.web.getTitle() : hostOf(t.url))
                     : t.title;
             t.chip.setText(title);
-            t.chip.setTextColor(on ? Ui.CYAN : 0xFFB6BEDC);
-            ((TextView) cell.getTag()).setTextColor(on ? Ui.CYAN : Ui.DIM);
+            t.chip.setTextColor(on ? TXT_ON : TXT_OFF);
+            ((TextView) cell.getTag()).setTextColor(on ? TXT_ON : TXT_OFF);
         }
     }
 
@@ -326,7 +346,7 @@ final class BrowserPage extends LinearLayout {
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);
         cm.setAcceptThirdPartyCookies(w, true);
-        w.setBackgroundColor(0xFF0B1020);
+        w.setBackgroundColor(0xFF121212);
         w.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, android.webkit.WebResourceRequest r) {
