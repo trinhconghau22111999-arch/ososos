@@ -1635,6 +1635,10 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
     }
 
     private fun takeScreenshot() {
+        if (incognitoOn) {
+            Toast.makeText(this, "Chụp màn hình không dùng được ở chế độ ẩn danh", Toast.LENGTH_SHORT).show()
+            return
+        }
         val wv = active?.webView ?: return
         if (wv.width <= 0 || wv.height <= 0) return
         try {
