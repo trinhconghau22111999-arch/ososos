@@ -138,7 +138,8 @@ public class TvPage extends FrameLayout {
     private WebView web;
     private FrameLayout fullLayer, cover;
     private TextView osd, osdTime, msg, coverName, coverNum, rightTitle;
-    private LinearLayout overlay;
+    private LinearLayout overlay, leftCol, rightCol;
+    private boolean narrow;
     private ListView groupList, chList;
     private RowAdapter leftAd, rightAd;
     private View fullView;
@@ -221,10 +222,20 @@ public class TvPage extends FrameLayout {
                 if (down && cur != null) hideOverlay(true);
                 return true;
             }
+            if (down && channelsColumnOnly() && k == KeyEvent.KEYCODE_DPAD_LEFT) {
+                showColumn(false);
+                groupList.requestFocus();
+                return true;
+            }
             if (down && groupList.hasFocus()) {
                 if (k == KeyEvent.KEYCODE_DPAD_RIGHT) {          // sang cột Kênh: chắc chắn đúng đài
                     syncGroup();
                     if (shownList.isEmpty()) return true;        // đài 1 kênh: không có gì bên phải
+                    if (narrow) {
+                        showColumn(true);
+                        chList.requestFocus();
+                        return true;
+                    }
                 }
                 boolean r = pass.dispatch(e);
                 if (k == KeyEvent.KEYCODE_DPAD_UP || k == KeyEvent.KEYCODE_DPAD_DOWN
@@ -296,7 +307,14 @@ public class TvPage extends FrameLayout {
             hideFull();
             return true;
         }
-        if (overlayOn()) return false;
+        if (overlayOn()) {
+            if (channelsColumnOnly()) {      // đang ở danh sách kênh của một đài: về danh sách đài
+                showColumn(false);
+                groupList.requestFocus();
+                return true;
+            }
+            return false;
+        }
         showOverlay(true);
         return true;
     }
@@ -585,6 +603,7 @@ public class TvPage extends FrameLayout {
                 play(l.get(0));
             } else {
                 setGroup(pos);
+                showColumn(true);
                 chList.setSelection(0);
                 chList.requestFocus();
             }
@@ -593,18 +612,26 @@ public class TvPage extends FrameLayout {
             if (pos >= 0 && pos < shownList.size()) play(shownList.get(pos));
         });
 
+        narrow = c.getResources().getConfiguration().screenWidthDp < 600;
         LinearLayout left = new LinearLayout(c);
+        leftCol = left;
         left.setOrientation(LinearLayout.VERTICAL);
         left.addView(title("ĐÀI"));
         left.addView(groupList, new LinearLayout.LayoutParams(-1, 0, 1f));
         rightTitle = title("");
         LinearLayout right = new LinearLayout(c);
+        rightCol = right;
         right.setOrientation(LinearLayout.VERTICAL);
-        right.setPadding(dp(28), 0, 0, 0);
+        right.setPadding(narrow ? 0 : dp(28), 0, 0, 0);
         right.addView(rightTitle);
         right.addView(chList, new LinearLayout.LayoutParams(-1, 0, 1f));
-        overlay.addView(left, new LinearLayout.LayoutParams(0, -1, 3f));
-        overlay.addView(right, new LinearLayout.LayoutParams(0, -1, 7f));
+        // màn hình hẹp (điện thoại dọc): chỉ hiện 1 cột tại một thời điểm để thấy đủ tên kênh
+        overlay.addView(left, new LinearLayout.LayoutParams(0, -1, narrow ? 1f : 3f));
+        overlay.addView(right, new LinearLayout.LayoutParams(0, -1, narrow ? 1f : 7f));
+        if (narrow) {
+            overlay.setPadding(dp(16), dp(28), dp(16), dp(16));
+            showColumn(false);
+        }
         addView(overlay, new FrameLayout.LayoutParams(-1, -1));
     }
 
@@ -822,6 +849,17 @@ public class TvPage extends FrameLayout {
         return overlay.getVisibility() == View.VISIBLE;
     }
 
+    /** Màn hẹp: true = chỉ hiện cột Kênh, false = chỉ hiện cột Đài. Màn rộng: luôn hiện cả hai. */
+    private void showColumn(boolean channels) {
+        if (!narrow) return;
+        leftCol.setVisibility(channels ? View.GONE : View.VISIBLE);
+        rightCol.setVisibility(channels ? View.VISIBLE : View.GONE);
+    }
+
+    private boolean channelsColumnOnly() {
+        return narrow && rightCol.getVisibility() == View.VISIBLE && leftCol.getVisibility() == View.GONE;
+    }
+
     private void setGroup(int gi) {
         if (groupNames.isEmpty()) return;
         leftSel = Math.max(0, Math.min(groupNames.size() - 1, gi));
@@ -858,6 +896,7 @@ public class TvPage extends FrameLayout {
         if (c != null) silence();
         groupList.setSelection(leftSel);
         chList.setSelection(c != null ? Math.max(0, shownList.indexOf(c)) : 0);
+        showColumn(!(focusGroups || shownList.isEmpty()));
         if (focusGroups || shownList.isEmpty()) groupList.requestFocus();
         else chList.requestFocus();
     }

@@ -274,15 +274,15 @@ public class MainActivity extends Activity {
         if (ytPanel.getVisibility() != yv) ytPanel.setVisibility(yv);
         if (tvPanel.getVisibility() != tvv) tvPanel.setVisibility(tvv);
         if (rcPanel.getVisibility() != rv) rcPanel.setVisibility(rv);
-        // Trang TV hiện hẳn (khoảng -2): phát TV, tắt YouTube
-        boolean tvAct = pos <= -1.5f && pos > -2.5f;
+        // Trang TV chỉ bật khi đã dừng hẳn ở trang đó (không bật giữa lúc đang vuốt, tránh khựng)
+        boolean tvAct = Math.abs(pos + 2f) < 0.02f;
         if (tv != null && tvAct != tvActive) {
             tvActive = tvAct;
             if (tvAct && yt != null) yt.evaluateJavascript("document.querySelectorAll('video').forEach(function(v){v.pause();})", null);
             tv.setActive(tvAct);
         }
-        // Trang Điều khiển hiện hẳn (khoảng -3): chỉ lúc này mới kết nối
-        boolean rcAct = pos <= -2.5f;
+        // Trang Điều khiển: chỉ kết nối khi đã dừng hẳn ở trang đó
+        boolean rcAct = pos <= -2.98f;
         if (rc != null && rcAct != rcActive) {
             rcActive = rcAct;
             rc.setActive(rcAct);
@@ -505,7 +505,7 @@ public class MainActivity extends Activity {
                 dragging = false;
                 if (customView != null) tracking = false;
                 else if (pos == 0f) tracking = !search.hasFocus();
-                else if (pos <= -2.5f) tracking = downX < dp(16);   // trang Điều khiển: chỉ vuốt từ mép trái để quay lại; còn lại là chuột cảm ứng
+                else if (pos <= -2.5f) tracking = rc.canSwipeBackFrom(downX, downY);   // trang Điều khiển: vuốt từ mép trái hoặc từ vùng ngoài ô cảm ứng để quay lại
                 else tracking = true;   // YouTube / TV: hướng vuốt được kiểm tra ở ACTION_MOVE
                 break;
             case MotionEvent.ACTION_MOVE:
@@ -804,8 +804,8 @@ public class MainActivity extends Activity {
         cols = n;
         try {
             getSharedPreferences(PREFS, MODE_PRIVATE).edit().putInt("cols", cols).apply();
-            grid.setColumnCount(cols);
             restyleTiles();
+            layoutGrid();
         } catch (Exception ex) {
             // Phòng khi bố cục lỗi: dựng lại từ đầu một lần
             try {
@@ -813,6 +813,22 @@ public class MainActivity extends Activity {
                 reloadApps();
             } catch (Exception ignored) { }
         }
+    }
+
+    /** Xếp lại các ô theo số cột hiện tại bằng chỉ số hàng/cột rõ ràng (GridLayout tự xếp không đổi cột khi đang chạy). */
+    private void layoutGrid() {
+        int k = 0;
+        for (int i = 0; i < grid.getChildCount(); i++) {
+            View v = grid.getChildAt(i);
+            if (v.getVisibility() == View.GONE) continue;
+            GridLayout.LayoutParams lp = (GridLayout.LayoutParams) v.getLayoutParams();
+            lp.rowSpec = GridLayout.spec(k / cols);
+            lp.columnSpec = GridLayout.spec(k % cols, 1f);
+            v.setLayoutParams(lp);
+            k++;
+        }
+        grid.setColumnCount(cols);
+        grid.requestLayout();
     }
 
     private void restyleTiles() {
@@ -884,5 +900,6 @@ public class MainActivity extends Activity {
             boolean ok = k.isEmpty() || String.valueOf(v.getTag()).contains(k);
             v.setVisibility(ok ? View.VISIBLE : View.GONE);
         }
+        layoutGrid();
     }
 }
