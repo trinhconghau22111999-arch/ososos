@@ -33,6 +33,9 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import org.json.JSONObject;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import android.widget.FrameLayout;
 import android.widget.EditText;
 import android.widget.GridLayout;
@@ -264,7 +267,22 @@ public class MainActivity extends Activity {
         ws.setLoadWithOverviewMode(true);
         CookieManager.getInstance().setAcceptCookie(true);
         yt.setBackgroundColor(0xFF0D1224);
-        yt.setWebViewClient(new WebViewClient());
+        yt.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageStarted(WebView v, String url, android.graphics.Bitmap icon) {
+                injectTheme(v);
+            }
+
+            @Override
+            public void onPageCommitVisible(WebView v, String url) {
+                injectTheme(v);
+            }
+
+            @Override
+            public void onPageFinished(WebView v, String url) {
+                injectTheme(v);
+            }
+        });
         yt.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onShowCustomView(View view, CustomViewCallback cb) {
@@ -283,6 +301,25 @@ public class MainActivity extends Activity {
         });
         holder.addView(yt, new FrameLayout.LayoutParams(-1, -1));
         yt.loadUrl(YT_URL);
+    }
+
+    private String themeJs;
+
+    /** Phủ giao diện gaming (assets/yt_theme.css) lên trang YouTube. */
+    private void injectTheme(WebView v) {
+        try {
+            if (themeJs == null) {
+                StringBuilder sb = new StringBuilder();
+                BufferedReader r = new BufferedReader(new InputStreamReader(getAssets().open("yt_theme.css"), "UTF-8"));
+                String line;
+                while ((line = r.readLine()) != null) sb.append(line).append('\n');
+                r.close();
+                themeJs = "(function(){var id='hauos-theme',s=document.getElementById(id);"
+                        + "if(!s){s=document.createElement('style');s.id=id;(document.head||document.documentElement).appendChild(s);}"
+                        + "s.textContent=" + JSONObject.quote(sb.toString()) + ";})();";
+            }
+            v.evaluateJavascript(themeJs, null);
+        } catch (Exception ignored) { }
     }
 
     private void hideCustom() {

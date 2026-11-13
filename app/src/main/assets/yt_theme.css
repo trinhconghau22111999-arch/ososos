@@ -1,0 +1,107 @@
+/* Hậu OS - giao diện gaming cho YouTube (chỉnh file này để đổi màu/kiểu) */
+html, html[dark], :root {
+  --yt-spec-base-background: #0D1224 !important;
+  --yt-spec-general-background-a: #0D1224 !important;
+  --yt-spec-general-background-b: #0A0F20 !important;
+  --yt-spec-general-background-c: #121A33 !important;
+  --yt-spec-raised-background: #121A33 !important;
+  --yt-spec-menu-background: #121A33 !important;
+  --yt-spec-additive-background: #1B2547 !important;
+  --yt-spec-badge-chip-background: #1B2547 !important;
+  --yt-spec-button-chip-background: #121A33 !important;
+  --yt-spec-10-percent-layer: #2C3A78 !important;
+  --yt-spec-outline: #2C3A78 !important;
+  --yt-spec-text-primary: #FFFFFF !important;
+  --yt-spec-text-secondary: #7F8BC0 !important;
+  --yt-spec-call-to-action: #00E5FF !important;
+  --yt-spec-themed-blue: #00E5FF !important;
+  --yt-spec-static-brand-red: #FF2D8A !important;
+  --yt-spec-brand-button-background: #FF2D8A !important;
+  --yt-spec-selected-nav-text: #00E5FF !important;
+  --yt-spec-suggested-action: #0A3B4D !important;
+  --yt-spec-brand-background-solid: #0D1224 !important;
+  --yt-spec-icon-active-other: #00E5FF !important;
+  color-scheme: dark;
+}
+
+html, body, ytm-app, #app {
+  background: #0D1224 !important;
+  font-family: "sans-serif-condensed", "Roboto Condensed", "Roboto", sans-serif !important;
+}
+
+::selection { background: #00E5FF; color: #0D1224; }
+
+/* Thanh trên: viền gradient neon */
+ytm-mobile-topbar-renderer, header.mobile-topbar-header, .mobile-topbar-header {
+  background: #0D1224 !important;
+  border-bottom: 2px solid transparent !important;
+  border-image: linear-gradient(90deg, #00E5FF, #7B6CFF, #FF2D8A) 1 !important;
+}
+
+/* Thanh dưới */
+ytm-pivot-bar-renderer, .pivot-bar-item-tab {
+  background: #0A0F20 !important;
+}
+ytm-pivot-bar-renderer {
+  border-top: 2px solid transparent !important;
+  border-image: linear-gradient(90deg, #FF2D8A, #7B6CFF, #00E5FF) 1 !important;
+}
+.pivot-bar-item-title, .pivot-bar-item-tab span {
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+  font-weight: 700 !important;
+  font-size: 10px !important;
+}
+
+/* Chip lọc (Tất cả / Âm nhạc ...): khung vát góc */
+.chip-container, ytm-chip-cloud-chip-renderer .chip-container, ytm-feed-filter-chip-bar-renderer .chip-container {
+  background: #121A33 !important;
+  border: 1.5px solid #2C3A78 !important;
+  border-radius: 0 !important;
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  color: #FFFFFF !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+  font-weight: 700 !important;
+}
+.chip-container.selected, .chip-container[aria-selected="true"], .selected .chip-container {
+  background: #0A3B4D !important;
+  border-color: #00E5FF !important;
+  color: #00E5FF !important;
+}
+
+/* Thẻ video: khung neon, vát góc */
+ytm-rich-item-renderer, ytm-video-with-context-renderer, ytm-compact-video-renderer, ytm-media-item {
+  background: #121A33 !important;
+  border: 1.5px solid #2C3A78 !important;
+  border-radius: 0 !important;
+  margin: 10px 8px !important;
+  clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+}
+ytm-rich-item-renderer ytm-thumbnail-cover, ytm-media-item ytm-thumbnail-cover,
+ytm-rich-item-renderer .video-thumbnail-container-large, ytm-media-item .video-thumbnail-container-compact {
+  border-radius: 0 !important;
+}
+
+/* Tiêu đề video đậm, gọn */
+h3, .media-item-headline, .compact-media-item-headline {
+  font-weight: 700 !important;
+  letter-spacing: 0.02em !important;
+}
+
+/* Thanh tìm kiếm */
+ytm-search-box, .searchbox-input, input[type="text"], input[type="search"] {
+  background: #121A33 !important;
+  border: 1.5px solid #2C3A78 !important;
+  border-radius: 0 !important;
+  color: #FFFFFF !important;
+}
+
+/* Nút nhấn / badge */
+.yt-spec-button-shape-next--call-to-action, .yt-spec-button-shape-next--filled {
+  border-radius: 0 !important;
+}
+.yt-spec-button-shape-next--call-to-action { background: #00E5FF !important; color: #0D1224 !important; }
+
+/* Thanh cuộn */
+::-webkit-scrollbar { width: 0; height: 0; }
