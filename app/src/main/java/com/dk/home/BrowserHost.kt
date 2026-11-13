@@ -366,7 +366,7 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
             orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(COLOR_TAB_BG)
         }
-        // Nút > ở trái cùng: bấm để hiện thanh app (Telegram, Zalo, Facebook, YouTube...) đang ẩn
+        // Nút > ở trái cùng: bấm để hiện thanh app (YouTube, Google) đang ẩn
         val st = TextView(this).apply {
             text = "›"
             textSize = 24f
@@ -2236,9 +2236,6 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
     // ====================== Chia doi man hinh ======================
 
     private val splitUrls = linkedMapOf(
-        "Telegram" to "https://web.telegram.org/k/",
-        "Zalo" to "https://chat.zalo.me/",
-        "Facebook" to "https://www.facebook.com/?locale=vi_VN",
         "YouTube" to "https://www.youtube.com/?hl=vi&gl=VN&persist_hl=1",
         "Google" to "https://www.google.com/?hl=vi"
     )
@@ -2260,9 +2257,6 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
 
     // (icon chinh thuc dang vector, mau nen hinh tron, do dem dp)
     private val sideIconSpec = mapOf(
-        "Telegram" to Triple(R.drawable.ic_telegram, Color.WHITE, 3),
-        "Zalo" to Triple(R.drawable.ic_zalo, 0xFF0068FF.toInt(), 4),
-        "Facebook" to Triple(R.drawable.ic_facebook, Color.WHITE, 3),
         "YouTube" to Triple(R.drawable.ic_youtube, Color.WHITE, 5),
         "Google" to Triple(R.drawable.ic_google, Color.WHITE, 6)
     )
@@ -2287,7 +2281,6 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
     }
 
     // YouTube / Google: dong lai chi nho duong dan cu (va chi chay nen khi dang phat video).
-    // Telegram / Zalo / Facebook: dong la dong han, mo lai vao tu dau.
     private val KEEP_URL_SERVICES = setOf("YouTube", "Google")
 
     private fun enterSplit(service: String) {
@@ -2296,8 +2289,6 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
         val t = splitTabs.getOrPut(service) {
             val wv = createConfiguredWebView()
             val nt = Tab(wv, TextView(this))
-            // Zalo Web chi mo giao dien chat tren may tinh; UA di dong bi day sang trang tai app.
-            if (service == "Zalo") { wv.settings.userAgentString = desktopUa; nt.desktop = true }
             setupClients(nt)
             wv.visibility = View.GONE
             splitPaneHolder.addView(wv, FrameLayout.LayoutParams(MATCH, MATCH))
