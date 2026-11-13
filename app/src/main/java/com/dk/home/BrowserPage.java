@@ -91,15 +91,15 @@ final class BrowserPage extends LinearLayout {
         tabScroll.setOverScrollMode(OVER_SCROLL_NEVER);
         tabRow = new LinearLayout(a);
         tabRow.setOrientation(HORIZONTAL);
-        tabRow.setPadding(dp(8), dp(6), dp(8), dp(6));
-        tabScroll.addView(tabRow, new ViewGroup.LayoutParams(-2, -2));
-        addView(tabScroll, new LayoutParams(-1, dp(40)));
+        tabRow.setPadding(dp(8), dp(4), dp(8), dp(4));
+        tabScroll.addView(tabRow, new FrameLayout.LayoutParams(-2, -1));   // cao bằng thanh tab, tab không bị cắt/lệch lên trên
+        addView(tabScroll, new LayoutParams(-1, dp(36)));
 
         // --- hàng ô địa chỉ ---
         LinearLayout bar = new LinearLayout(a);
         bar.setOrientation(HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(8), dp(4), dp(4), dp(8));
+        bar.setPadding(dp(8), 0, dp(4), dp(8));
 
         urlBox = new EditText(a);
         urlBox.setSingleLine(true);
