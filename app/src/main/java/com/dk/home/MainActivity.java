@@ -4,6 +4,11 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
+import android.widget.BaseAdapter;
+import android.widget.ListView;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -454,23 +459,143 @@ public class MainActivity extends Activity {
         return Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, category);
     }
 
+    private static final String PREFS = "hauos";
+    private Intent[] dockDefaults;
+
     private void buildDock() {
         LinearLayout dock = findViewById(R.id.dock);
-        Intent[] list = {
-                new Intent(Intent.ACTION_DIAL),
-                sel(Intent.CATEGORY_APP_MESSAGING),
-                sel(Intent.CATEGORY_APP_BROWSER),
-                new Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
-        };
-        for (final Intent i : list) {
-            ResolveInfo ri = pm.resolveActivity(i, 0);
-            if (ri == null) continue;
-            LinearLayout t = makeTile(ri.loadLabel(pm), ri.loadIcon(pm), 38, Ui.PLAIN);
-            t.setOnClickListener(x -> go(new Intent(i)));
+        dock.removeAllViews();
+        if (dockDefaults == null) {
+            dockDefaults = new Intent[]{
+                    new Intent(Intent.ACTION_DIAL),
+                    sel(Intent.CATEGORY_APP_MESSAGING),
+                    sel(Intent.CATEGORY_APP_BROWSER),
+                    new Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
+            };
+        }
+        SharedPreferences sp = getSharedPreferences(PREFS, MODE_PRIVATE);
+        for (int i = 0; i < dockDefaults.length; i++) {
+            final int slot = i;
+            Intent launch = null;
+            CharSequence label = null;
+            Drawable icon = null;
+            String saved = sp.getString("dock" + i, null);
+            if (saved != null) {
+                ComponentName cn = ComponentName.unflattenFromString(saved);
+                if (cn != null) {
+                    try {
+                        ActivityInfo ai = pm.getActivityInfo(cn, 0);
+                        label = ai.loadLabel(pm);
+                        icon = ai.loadIcon(pm);
+                        launch = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(cn);
+                    } catch (Exception ignored) { }
+                }
+            }
+            if (launch == null) {
+                ResolveInfo ri = pm.resolveActivity(dockDefaults[i], 0);
+                if (ri != null) {
+                    label = ri.loadLabel(pm);
+                    icon = ri.loadIcon(pm);
+                    launch = new Intent(dockDefaults[i]);
+                } else {
+                    label = "+";
+                    icon = getResources().getDrawable(android.R.drawable.ic_input_add);
+                }
+            }
+            final Intent fl = launch;
+            LinearLayout t = makeTile(label, icon, 38, Ui.PLAIN);
+            t.setOnClickListener(x -> { if (fl != null) go(new Intent(fl)); else showDockPicker(slot); });
+            t.setOnLongClickListener(x -> {
+                x.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                showDockPicker(slot);
+                return true;
+            });
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
             lp.setMargins(dp(3), 0, dp(3), 0);
             dock.addView(t, lp);
         }
+    }
+
+    /** Nhấn giữ một ô ở thanh dưới: hiện danh sách mọi ứng dụng để thay vào ô đó. */
+    private void showDockPicker(final int slot) {
+        Intent main = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
+        final List<Entry> list = new ArrayList<>();
+        for (ResolveInfo ri : pm.queryIntentActivities(main, 0)) {
+            if (ri.activityInfo.packageName.equals(getPackageName())) continue;
+            Entry e = new Entry();
+            e.label = ri.loadLabel(pm);
+            e.icon = ri.loadIcon(pm);
+            e.cn = new ComponentName(ri.activityInfo.packageName, ri.activityInfo.name);
+            list.add(e);
+        }
+        Collections.sort(list, new Comparator<Entry>() {
+            public int compare(Entry x, Entry y) {
+                return x.label.toString().compareToIgnoreCase(y.label.toString());
+            }
+        });
+
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(16), dp(16), dp(16), dp(10));
+
+        TextView title = new TextView(this);
+        title.setText(Ui.up("Chọn ứng dụng thay thế"));
+        title.setTextColor(Ui.CYAN);
+        title.setTextSize(16);
+        Ui.style(title);
+        box.addView(title);
+
+        TextView reset = new TextView(this);
+        reset.setText(Ui.up("↺  Trở về mặc định"));
+        reset.setTextColor(Ui.PINK);
+        reset.setTextSize(13);
+        reset.setPadding(0, dp(10), 0, dp(10));
+        Ui.style(reset);
+        box.addView(reset);
+
+        ListView lv = new ListView(this);
+        lv.setDivider(null);
+        lv.setAdapter(new BaseAdapter() {
+            public int getCount() { return list.size(); }
+            public Object getItem(int i) { return list.get(i); }
+            public long getItemId(int i) { return i; }
+            public View getView(int i, View cv, ViewGroup parent) {
+                LinearLayout row = new LinearLayout(MainActivity.this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setPadding(dp(4), dp(7), dp(4), dp(7));
+                ImageView iv = new ImageView(MainActivity.this);
+                iv.setImageDrawable(list.get(i).icon);
+                row.addView(iv, new LinearLayout.LayoutParams(dp(38), dp(38)));
+                TextView tv = new TextView(MainActivity.this);
+                tv.setText(Ui.up(list.get(i).label));
+                tv.setTextColor(Color.WHITE);
+                tv.setTextSize(14);
+                tv.setMaxLines(1);
+                tv.setEllipsize(TextUtils.TruncateAt.END);
+                tv.setPadding(dp(14), 0, 0, 0);
+                Ui.style(tv);
+                row.addView(tv, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+                return row;
+            }
+        });
+        int maxH = (int) (getResources().getDisplayMetrics().heightPixels * 0.6f);
+        box.addView(lv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, maxH));
+
+        final AlertDialog d = new AlertDialog.Builder(this).setView(box).create();
+        if (d.getWindow() != null) d.getWindow().setBackgroundDrawable(Ui.panel(this, Ui.GRID));
+        lv.setOnItemClickListener((parent, v, pos2, id) -> {
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putString("dock" + slot, list.get(pos2).cn.flattenToString()).apply();
+            buildDock();
+            d.dismiss();
+        });
+        reset.setOnClickListener(v -> {
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove("dock" + slot).apply();
+            buildDock();
+            d.dismiss();
+        });
+        d.show();
     }
 
     /** Đưa toàn bộ ứng dụng lên màn hình chính. */
