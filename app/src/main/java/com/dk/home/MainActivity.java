@@ -815,20 +815,30 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** Xếp lại các ô theo số cột hiện tại bằng chỉ số hàng/cột rõ ràng (GridLayout tự xếp không đổi cột khi đang chạy). */
+    private boolean rebuildPending;
+
+    /**
+     * Xếp lại các ô theo số cột hiện tại: gỡ hết ô rồi thêm lại với thông số mới (giống lúc mở app),
+     * làm sau khi cử chỉ kết thúc (post) để không đụng vào lúc đang xử lý cảm ứng.
+     */
     private void layoutGrid() {
-        int k = 0;
-        for (int i = 0; i < grid.getChildCount(); i++) {
-            View v = grid.getChildAt(i);
-            if (v.getVisibility() == View.GONE) continue;
-            GridLayout.LayoutParams lp = (GridLayout.LayoutParams) v.getLayoutParams();
-            lp.rowSpec = GridLayout.spec(k / cols);
-            lp.columnSpec = GridLayout.spec(k % cols, 1f);
-            v.setLayoutParams(lp);
-            k++;
-        }
-        grid.setColumnCount(cols);
-        grid.requestLayout();
+        if (rebuildPending) return;
+        rebuildPending = true;
+        grid.post(() -> {
+            rebuildPending = false;
+            List<View> kids = new ArrayList<>();
+            for (int i = 0; i < grid.getChildCount(); i++) kids.add(grid.getChildAt(i));
+            grid.removeAllViews();
+            grid.setColumnCount(cols);
+            for (View v : kids) {
+                GridLayout.LayoutParams lp = new GridLayout.LayoutParams(
+                        GridLayout.spec(GridLayout.UNDEFINED), GridLayout.spec(GridLayout.UNDEFINED, 1f));
+                lp.width = 0;
+                lp.setMargins(dp(3), dp(3), dp(3), dp(3));
+                grid.addView(v, lp);
+            }
+            grid.requestLayout();
+        });
     }
 
     private void restyleTiles() {
@@ -900,6 +910,5 @@ public class MainActivity extends Activity {
             boolean ok = k.isEmpty() || String.valueOf(v.getTag()).contains(k);
             v.setVisibility(ok ? View.VISIBLE : View.GONE);
         }
-        layoutGrid();
     }
 }
