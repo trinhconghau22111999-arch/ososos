@@ -31,6 +31,7 @@ import android.provider.Settings;
 import android.telephony.TelephonyManager;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
@@ -42,6 +43,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /** Trung tâm điều khiển: các nút nhanh + thanh trượt, dựng bằng code. */
@@ -388,6 +390,11 @@ final class ControlCenter {
     private static final String PREFS = "hauos", KEY_PINNED = "cc_pinned";
     private static final int PIN_ROW = 4;
     private final List<View> pinnedViews = new ArrayList<>();
+    private final List<ComponentName> shownCns = new ArrayList<>();
+    /** true khi đang kéo một ô: MainActivity không được chuyển trang theo cử chỉ này. */
+    static boolean tileDragging;
+    private View dragView, dragTarget;
+    private float downRawX, downRawY;
 
     private List<ComponentName> pinnedList() {
         List<ComponentName> out = new ArrayList<>();
@@ -427,6 +434,7 @@ final class ControlCenter {
     private void rebuildPinned() {
         for (View v : pinnedViews) grid.removeView(v);
         pinnedViews.clear();
+        shownCns.clear();
         PackageManager pm = a.getPackageManager();
         int idx = 0;
         for (final ComponentName cn : pinnedList()) {
@@ -458,14 +466,89 @@ final class ControlCenter {
             tv.setPadding(dp(2), dp(4), dp(2), 0);
             t.addView(tv, new LinearLayout.LayoutParams(-1, -2));
             t.setOnClickListener(v -> go(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(cn)));
+            // nhấn giữ rồi kéo sang ô khác để đổi chỗ (gỡ khỏi Tiện ích: nhấn giữ ứng dụng ở màn hình chính)
             t.setOnLongClickListener(v -> {
-                unpin(cn);
-                Toast.makeText(a, "Đã gỡ khỏi Tiện ích", Toast.LENGTH_SHORT).show();
+                startTileDrag(v);
                 return true;
             });
+            t.setOnTouchListener((v, ev) -> onTileTouch(v, ev));
             place(t, PIN_ROW + idx / 4, idx % 4, 1, 1);
             pinnedViews.add(t);
+            shownCns.add(cn);
             idx++;
+        }
+    }
+
+    private void startTileDrag(View v) {
+        dragView = v;
+        dragTarget = null;
+        tileDragging = true;
+        if (v.getParent() != null) v.getParent().requestDisallowInterceptTouchEvent(true);
+        v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+        v.setTranslationZ(dp(12));
+        v.animate().scaleX(1.08f).scaleY(1.08f).alpha(0.85f).setDuration(120).start();
+    }
+
+    private boolean onTileTouch(View v, MotionEvent ev) {
+        int act = ev.getActionMasked();
+        if (act == MotionEvent.ACTION_DOWN) {
+            downRawX = ev.getRawX();
+            downRawY = ev.getRawY();
+            return false;
+        }
+        if (dragView != v) return false;
+        if (act == MotionEvent.ACTION_MOVE) {
+            v.setTranslationX(ev.getRawX() - downRawX);
+            v.setTranslationY(ev.getRawY() - downRawY);
+            updateDragTarget(v);
+            return true;
+        }
+        if (act == MotionEvent.ACTION_UP || act == MotionEvent.ACTION_CANCEL) {
+            finishTileDrag(act == MotionEvent.ACTION_UP);
+            return true;
+        }
+        return false;
+    }
+
+    /** Ô bị kéo đang đè lên ô nào thì ô đó là ô đích (làm mờ để báo hiệu). */
+    private void updateDragTarget(View v) {
+        int[] loc = new int[2];
+        v.getLocationOnScreen(loc);
+        float cx = loc[0] + v.getWidth() * v.getScaleX() / 2f;
+        float cy = loc[1] + v.getHeight() * v.getScaleY() / 2f;
+        View hit = null;
+        for (View p : pinnedViews) {
+            if (p == v) continue;
+            int[] pl = new int[2];
+            p.getLocationOnScreen(pl);
+            if (cx >= pl[0] && cx <= pl[0] + p.getWidth() && cy >= pl[1] && cy <= pl[1] + p.getHeight()) {
+                hit = p;
+                break;
+            }
+        }
+        if (hit != dragTarget) {
+            if (dragTarget != null) dragTarget.setAlpha(1f);
+            if (hit != null) hit.setAlpha(0.45f);
+            dragTarget = hit;
+        }
+    }
+
+    private void finishTileDrag(boolean commit) {
+        final View v = dragView, tg = dragTarget;
+        dragView = null;
+        dragTarget = null;
+        tileDragging = false;
+        for (View p : pinnedViews) p.setAlpha(1f);
+        if (v == null) return;
+        int i = pinnedViews.indexOf(v), j = tg == null ? -1 : pinnedViews.indexOf(tg);
+        if (commit && i >= 0 && j >= 0 && i != j) {
+            List<ComponentName> l = new ArrayList<>(shownCns);
+            Collections.swap(l, i, j);
+            savePinned(l);
+            rebuildPinned();
+        } else {
+            v.animate().translationX(0f).translationY(0f).scaleX(1f).scaleY(1f).alpha(1f).setDuration(150)
+                    .withEndAction(() -> v.setTranslationZ(0f)).start();
         }
     }
 

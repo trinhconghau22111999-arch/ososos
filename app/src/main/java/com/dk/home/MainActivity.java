@@ -476,6 +476,14 @@ public class MainActivity extends Activity {
     @Override
     public boolean dispatchTouchEvent(MotionEvent e) {
         if (vt != null) vt.addMovement(e);
+        // Đang kéo ô trên trang Tiện ích để đổi chỗ: không chuyển trang / không chụm theo cử chỉ này
+        if (ControlCenter.tileDragging) {
+            tracking = false;
+            boolean r = super.dispatchTouchEvent(e);
+            int a0 = e.getActionMasked();
+            if (a0 == MotionEvent.ACTION_UP || a0 == MotionEvent.ACTION_CANCEL) ControlCenter.tileDragging = false;
+            return r;
+        }
         // Chụm / nở hai ngón tay trên màn hình chính để đổi số ứng dụng mỗi hàng
         if (pos == 0f && !dragging && customView == null) {
             if (e.getActionMasked() == MotionEvent.ACTION_DOWN) pinching = false;
