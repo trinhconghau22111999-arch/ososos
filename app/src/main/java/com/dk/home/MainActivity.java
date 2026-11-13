@@ -442,7 +442,7 @@ public class MainActivity extends Activity {
                 if (customView != null) tracking = false;
                 else if (pos == 0f) tracking = !search.hasFocus();
                 else if (pos > 0f) tracking = true;
-                else tracking = downX < dp(40);
+                else tracking = downX < dp(40) || !yt.canScrollHorizontally(-1);   // YouTube: vuốt trái sang phải ở bất kỳ đâu để về, trừ khi trang đang cuộn ngang
                 break;
             case MotionEvent.ACTION_MOVE:
                 if (tracking && !dragging) {
@@ -497,6 +497,8 @@ public class MainActivity extends Activity {
                     animateTo(target, vx);
                     return true;
                 }
+                // Chạm giữa lúc đang trượt làm hoạt ảnh bị huỷ: không để trang kẹt lưng chừng
+                if (pos != 0f && pos != 1f && pos != -1f) animateTo(Math.round(pos));
                 break;
         }
         return super.dispatchTouchEvent(e);
