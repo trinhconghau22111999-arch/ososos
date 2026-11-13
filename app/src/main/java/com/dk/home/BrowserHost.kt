@@ -345,7 +345,6 @@ class BrowserHost(private val act: Activity, private val onClose: () -> Unit) : 
             }
         }
         bar.addView(urlBar, LinearLayout.LayoutParams(0, dp(40), 1f).apply { leftMargin = dp(4); rightMargin = dp(4) })
-        bar.addView(iconBtn(R.drawable.ic_shot, "Chụp màn hình") { takeScreenshot() })
         bookmarkBtn = iconBtn(R.drawable.ic_star_off, "Dấu trang") { toggleBookmark() }
         bar.addView(bookmarkBtn)
         bar.addView(iconBtn(R.drawable.ic_download, "Tải xuống") { openDownloads() })
