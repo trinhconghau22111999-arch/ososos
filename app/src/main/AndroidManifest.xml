@@ -9,7 +9,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <application
-        android:label="DK Home"
+        android:label="Hậu OS"
         android:theme="@style/AppTheme">
         <activity
             android:name=".MainActivity"
@@ -31,7 +31,7 @@
         <service
             android:name=".ScreenshotService"
             android:exported="true"
-            android:label="DK Home - Chụp màn hình"
+            android:label="Hậu OS - Chụp màn hình"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />

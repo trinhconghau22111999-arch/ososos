@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="a11y_desc">Cho phép DK Home chụp màn hình và bật/tắt các nút hệ thống (dữ liệu di động, máy bay, phát Wi-Fi, chế độ tối…) ngay trong Trung tâm điều khiển.</string>
+    <string name="a11y_desc">Cho phép Hậu OS chụp màn hình và bật/tắt các nút hệ thống (dữ liệu di động, máy bay, phát Wi-Fi, chế độ tối…) ngay trong Trung tâm điều khiển.</string>
 </resources>

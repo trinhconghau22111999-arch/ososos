@@ -172,7 +172,7 @@ final class ControlCenter {
     private void viaQs(String fallbackAction, String... keys) {
         ScreenshotService svc = ScreenshotService.instance;
         if (svc == null) {
-            Toast.makeText(a, "Mở cài đặt. Bật \"DK Home\" trong Hỗ trợ tiếp cận để bấm trực tiếp được", Toast.LENGTH_LONG).show();
+            Toast.makeText(a, "Mở cài đặt. Bật \"Hậu OS\" trong Hỗ trợ tiếp cận để bấm trực tiếp được", Toast.LENGTH_LONG).show();
             go(new Intent(fallbackAction));
             return;
         }
@@ -201,7 +201,7 @@ final class ControlCenter {
     private void askWrite() {
         if (askedWrite) return;
         askedWrite = true;
-        Toast.makeText(a, "Cho phép DK Home chỉnh cài đặt hệ thống rồi quay lại", Toast.LENGTH_LONG).show();
+        Toast.makeText(a, "Cho phép Hậu OS chỉnh cài đặt hệ thống rồi quay lại", Toast.LENGTH_LONG).show();
         go(new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:" + a.getPackageName())));
     }
 
@@ -332,7 +332,7 @@ final class ControlCenter {
                         ScreenshotService.instance.performGlobalAction(AccessibilityService.GLOBAL_ACTION_TAKE_SCREENSHOT);
                 }, 500);
             } else {
-                Toast.makeText(a, "Bật \"DK Home - Chụp màn hình\" trong Hỗ trợ tiếp cận", Toast.LENGTH_LONG).show();
+                Toast.makeText(a, "Bật \"Hậu OS - Chụp màn hình\" trong Hỗ trợ tiếp cận", Toast.LENGTH_LONG).show();
                 go(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
             }
         });
