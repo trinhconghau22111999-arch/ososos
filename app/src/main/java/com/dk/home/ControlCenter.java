@@ -247,7 +247,9 @@ final class ControlCenter {
 
     private void build() {
         int pad = dp(14);
-        cell = (a.getResources().getDisplayMetrics().widthPixels - 2 * pad) / 4;
+        // Màn hình lớn (máy tính bảng 10 inch): giới hạn cỡ ô để các icon nhỏ lại, dồn về góc trái trên
+        int fit = (a.getResources().getDisplayMetrics().widthPixels - 2 * pad) / 4;
+        cell = Math.min(fit, dp(88));
         margin = dp(4);
 
         // Hàng 1: Wi-Fi + dữ liệu di động
