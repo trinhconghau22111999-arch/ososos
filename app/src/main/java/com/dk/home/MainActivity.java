@@ -763,7 +763,7 @@ public class MainActivity extends Activity {
                 String line;
                 while ((line = r.readLine()) != null) sb.append(line).append('\n');
                 r.close();
-                themeJs = readAsset("yt_adskip.js") + readAsset("yt_adblock.js") + readAsset("yt_voice.js") + readAsset("yt_speed.js")
+                themeJs = readAsset("yt_adskip.js") + readAsset("yt_adblock.js") + readAsset("yt_voice.js") + readAsset("yt_speed.js") + readAsset("yt_watchlater.js")
                         + "\n(function(){var id='hauos-theme',s=document.getElementById(id);"
                         + "if(!s){s=document.createElement('style');s.id=id;(document.head||document.documentElement).appendChild(s);}"
                         + "s.textContent=" + JSONObject.quote(sb.toString()) + ";})();";
